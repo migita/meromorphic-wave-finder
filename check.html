@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="plot.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+
+<title>Check a solution — Meromorphic solutions</title>
+<meta name="description" content="Substitute a closed-form candidate into an equation; the answer is exact zero, not zero, or could not decide.">
+<script type="module" src="js/check.js"></script>
+</head>
+<body data-page="check">
+<a class="skip" href="#main">Skip to the content</a>
+<p class="preview" role="note">Preview — computed results carry labels; statements labelled 'agent-proof' have not been checked by a person.</p>
+<header class="site-header">
+  <a class="site-title" href="index.html">Meromorphic solutions <span>of autonomous polynomial differential equations</span></a>
+  <nav aria-label="Pages">
+    <ul>
+      <li><a href="index.html" data-nav="index">Solve</a></li>
+      <li><a href="catalogue.html" data-nav="catalogue">Catalogue</a></li>
+      <li><a href="coverage.html" data-nav="coverage">Coverage</a></li>
+      <li><a href="check.html" data-nav="check">Check a solution</a></li>
+      <li><a href="method.html" data-nav="method">Method</a></li>
+    </ul>
+  </nav>
+</header>
+<noscript><p>These pages need JavaScript: the reports are typeset and, in the static version, computed in the browser.</p></noscript>
+
+<main id="main">
+  <h1>Check a solution</h1>
+  <p class="prose">Enter an equation and a candidate in closed form. The engine substitutes the candidate and reduces the
+  result exactly. There are three possible answers: the residual is <strong>exactly zero</strong>, it is
+  <strong>not zero</strong>, or the engine <strong>could not decide</strong>. The answer “exactly zero” rests on exact
+  computation alone; a numerical residual, where one is shown, only illustrates the other two answers.</p>
+  <form class="check-form" id="check" autocomplete="off">
+    <div>
+      <label for="c-eq">Equation</label>
+      <input type="text" id="c-eq" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="w'' = 6*w^2">
+    </div>
+    <div>
+      <label for="c-expr">Candidate <span class="math" data-tex="w(z)">w(z)</span></label>
+      <textarea id="c-expr" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="1/(z - z0)^2"></textarea>
+    </div>
+    <div>
+      <label for="c-where">Values of parameters and constants, if any <span class="small muted">(separated by semicolons)</span></label>
+      <input type="text" id="c-where" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="a = 3/5; k = sqrt(11/19)/2">
+    </div>
+    <div class="ask-row">
+      <button type="submit" class="primary" id="c-go">Check</button>
+      <span class="small muted" id="backend" style="align-self:center"></span>
+    </div>
+    <ul class="chips" id="check-examples" aria-label="Examples">
+      <li><a href="check.html?eq=w%27%27+%3D+6*w%5E2&amp;expr=1%2F%28z+-+z0%29%5E2">a double pole</a></li>
+      <li><a href="check.html?eq=w%27%27+%3D+6*w%5E2+-+g2%2F2&amp;expr=wp%28z+-+z0%2C+g2%2C+g3%29">the Weierstrass function</a></li>
+      <li><a href="check.html?eq=w%27%27%27+%2B+w%27+%2B+w%5E2%2F2+%2B+A+%3D+0&amp;expr=15*sqrt%28209%29*%2811*tanh%28sqrt%28209%29*z%2F38%29%5E3+-+9*tanh%28sqrt%28209%29*z%2F38%29%29%2F361&amp;where=A+%3D+-4950%2F6859">a front of the Kuramoto–Sivashinsky reduction</a></li>
+    </ul>
+    <p class="syntax">Functions: <code>exp</code>, <code>tanh</code>, <code>tan</code>, <code>sqrt</code>, …;
+    Weierstrass functions <code>wp(z, g2, g3)</code> and <code>wpp(z, g2, g3)</code> (the derivative), with
+    <span class="math" data-tex="\wp'^2 = 4\wp^3 - g_2\wp - g_3">℘′² = 4℘³ − g₂℘ − g₃</span>. The imaginary unit is <code>I</code>.</p>
+  </form>
+  <div id="status" class="status" role="status" aria-live="polite" hidden>
+    <div class="status-text">
+      <p class="now" id="status-now"></p>
+      <p class="small muted" id="status-elapsed"></p>
+      <div class="log" id="status-log" aria-label="Messages of the engine"></div>
+    </div>
+    <button type="button" id="cancel">Cancel</button>
+  </div>
+  <div id="result"></div>
+</main>
+<footer class="site-footer">
+  <p>Data of 6 October 2026, 12:26 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="plot.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+
+<title>Method — Meromorphic solutions</title>
+<meta name="description" content="What the site does and does not do: definitions, the three lists, the labels, the theorems it relies on, and its limits.">
+<script type="module" src="js/method.js"></script>
+</head>
+<body data-page="method">
+<a class="skip" href="#main">Skip to the content</a>
+<p class="preview" role="note">Preview — computed results carry labels; statements labelled 'agent-proof' have not been checked by a person.</p>
+<header class="site-header">
+  <a class="site-title" href="index.html">Meromorphic solutions <span>of autonomous polynomial differential equations</span></a>
+  <nav aria-label="Pages">
+    <ul>
+      <li><a href="index.html" data-nav="index">Solve</a></li>
+      <li><a href="catalogue.html" data-nav="catalogue">Catalogue</a></li>
+      <li><a href="coverage.html" data-nav="coverage">Coverage</a></li>
+      <li><a href="check.html" data-nav="check">Check a solution</a></li>
+      <li><a href="method.html" data-nav="method">Method</a></li>
+    </ul>
+  </nav>
+</header>
+<noscript><p>These pages need JavaScript: the reports are typeset and, in the static version, computed in the browser.</p></noscript>
+
+<main id="main">
+  <div class="prose">
+  <h1>What the site does and does not do</h1>
+
+  <p>The visitor enters an autonomous polynomial ordinary differential equation, or picks a named evolution equation
+  and gets its travelling-wave reduction. For that equation the site reports which solutions are meromorphic in the
+  whole complex plane, as far as this can be decided, and says what each statement rests on.</p>
+
+  <ul class="toc">
+    <li><a href="#question">The question</a></li>
+    <li><a href="#kinds">Rational, simply periodic, elliptic</a></li>
+    <li><a href="#d">The number d</a></li>
+    <li><a href="#local">Local analysis</a></li>
+    <li><a href="#lists">The three lists</a></li>
+    <li><a href="#levels">The verdict</a></li>
+    <li><a href="#labels">The labels</a></li>
+    <li><a href="#independent">The independent check</a></li>
+    <li><a href="#theorems">The theorems</a></li>
+    <li><a href="#versions">Two versions</a></li>
+    <li><a href="#limits">Limits</a></li>
+  </ul>
+
+  <h2 id="question">The question</h2>
+  <p>The unknown is a function <span data-tex="w(z)">w(z)</span> of a complex variable. The equation is</p>
+  <p><span data-tex="E\bigl(w, w', \dots, w^{(K)}\bigr) = 0," data-display>E(w, w′, …, w^(K)) = 0,</span></p>
+  <p>where <span data-tex="E">E</span> is a polynomial in <span data-tex="w">w</span> and its derivatives whose
+  coefficients are rational numbers or parameters. The variable <span data-tex="z">z</span> does not occur: the
+  equation is <em>autonomous</em>. The <em>order</em> is <span data-tex="K">K</span>; the <em>degree</em> is the total
+  degree of <span data-tex="E">E</span> in <span data-tex="w, w', \dots, w^{(K)}">w, w′, …</span>. The equation is
+  <em>solved</em> for the highest derivative if
+  <span data-tex="E = c\,w^{(K)} - \Phi\bigl(w, \dots, w^{(K-1)}\bigr)">E = c w^(K) − Φ</span> with a nonzero constant
+  <span data-tex="c">c</span>.</p>
+  <p>A solution is <em>meromorphic in <span data-tex="\mathbb{C}">ℂ</span></em> if it is analytic in the whole plane
+  except for poles. Entire functions (no poles at all) and constants are included. Solutions with branch points or
+  essential singularities at finite points, and solutions that exist only on a part of the plane, are not the subject
+  of the site.</p>
+  <p>For an evolution equation in <span data-tex="u(x,t)">u(x,t)</span> the travelling-wave reduction
+  <span data-tex="u = w(z),\ z = x - ct">u = w(z), z = x − ct</span> is applied first and, where possible, integrated;
+  the constants of integration become parameters. The result page shows the reduction that was applied.</p>
+
+  <h2 id="kinds">Rational, simply periodic, elliptic</h2>
+  <p>Three kinds of meromorphic functions have closed forms that the site can find and check:</p>
+  <ul>
+    <li><em>rational</em> functions of <span data-tex="z">z</span>;</li>
+    <li><em>simply periodic</em> functions that are rational functions of one exponential
+      <span data-tex="s = \exp(\nu z)">s = exp(νz)</span>; hyperbolic and trigonometric tangents are of this kind;</li>
+    <li><em>elliptic</em> functions, that is, doubly periodic meromorphic functions. They are written with the
+      Weierstrass function <span data-tex="\wp(z; g_2, g_3)">℘(z; g₂, g₃)</span> and its derivative, which satisfy
+      <span data-tex="\wp'^2 = 4\wp^3 - g_2\wp - g_3">℘′² = 4℘³ − g₂℘ − g₃</span>.</li>
+  </ul>
+  <p>In the literature the union of these kinds, or its transcendental part, is often called the class
+  <span data-tex="W">W</span>. The site says “rational, simply periodic or elliptic”. In formulas that can be copied as
+  text, <code>wp(z, g2, g3)</code> stands for <span data-tex="\wp">℘</span> and <code>wpp(z, g2, g3)</code> for
+  <span data-tex="\wp'">℘′</span>.</p>
+
+  <h2 id="d">The number <span data-tex="d">d</span></h2>
+  <p>For a solution <span data-tex="w">w</span>, the number <span data-tex="d">d</span> is the transcendence degree
+  over <span data-tex="\mathbb{C}">ℂ</span> of the field generated by <span data-tex="w">w</span> and all its
+  derivatives: the largest number of algebraically independent functions among
+  <span data-tex="w, w', w'', \dots">w, w′, w″, …</span></p>
+  <ul>
+    <li><span data-tex="d = 0">d = 0</span>: constants.</li>
+    <li><span data-tex="d = 1">d = 1</span>: nonconstant rational functions, rational functions of one exponential,
+      elliptic functions.</li>
+    <li><span data-tex="d = 2">d = 2</span>: for example <span data-tex="e^{2z}\,\wp(e^{z})">exp(2z) ℘(exp z)</span>.</li>
+    <li><span data-tex="d \ge 3">d ≥ 3</span>: for example Painlevé transcendents in suitable variables.</li>
+  </ul>
+  <p>The site treats <span data-tex="d = 1">d = 1</span> completely where a theorem allows it, reports solutions with
+  <span data-tex="d = 2">d = 2</span> where they are known, and for <span data-tex="d \ge 3">d ≥ 3</span> says only
+  “ruled out” (with the theorem) or “not ruled out”.</p>
+
+  <h2 id="local">Local analysis</h2>
+  <p>At a pole of order <span data-tex="p">p</span> at <span data-tex="z_0">z₀</span> a solution has a Laurent series</p>
+  <p><span data-tex="w = \sum_{k \ge 0} c_k\,(z - z_0)^{k-p}, \qquad c_0 = a_0 \neq 0." data-display>w = Σ c_k (z − z₀)^(k−p)</span></p>
+  <p>The <em>weight</em> of a monomial <span data-tex="\prod_j \bigl(w^{(j)}\bigr)^{e_j}">∏ (w^(j))^e_j</span> at pole
+  order <span data-tex="p">p</span> is <span data-tex="\sum_j e_j\,(p + j)">Σ e_j (p + j)</span>: the order of its pole.
+  The monomials of largest weight form the <em>dominant part</em>; a pole is possible only where at least two of them
+  balance, and this fixes <span data-tex="p">p</span> and <span data-tex="a_0">a₀</span>.</p>
+  <p>The <em>Fuchs indices</em> are the roots <span data-tex="k">k</span> of the indicial polynomial of the dominant part
+  at <span data-tex="(p, a_0)">(p, a₀)</span>; <span data-tex="-1">−1</span> is always one of them. At a positive
+  integer Fuchs index the recurrence for the coefficients gives a <em>compatibility condition</em>; if it holds, the
+  coefficient <span data-tex="c_k">c_k</span> is free. The equation has the <em>finiteness property</em> if only
+  finitely many Laurent series with a pole at a given point satisfy it.</p>
+  <p>The result page gives this table for every equation (section “Local analysis”). By itself it decides nothing
+  about global solutions; it is the input of the theorems and of the searches.</p>
+
+  <h2 id="lists">The three lists</h2>
+  <p><strong>Found.</strong> Solutions meromorphic in the whole plane, in closed form. Each one carries an exact
+  check: the formula is substituted into the equation and the result is reduced to zero by exact computation (for
+  elliptic solutions modulo <span data-tex="\wp'^2 = 4\wp^3 - g_2\wp - g_3">℘′² = 4℘³ − g₂℘ − g₃</span>). Anyone
+  can rerun the check on the page <a href="check.html">Check a solution</a>. A solution may hold only under
+  conditions on the parameters; the conditions are listed with it.</p>
+  <p><strong>Ruled out.</strong> Kinds of meromorphic solutions that cannot exist. Each item names its basis: a theorem
+  of the list below, together with a record of how every hypothesis was verified for this equation, or an exact
+  computation that can be rerun.</p>
+  <p><strong>Not decided.</strong> What remains open for this equation, with the partial information that exists.
+  A partial answer is shown next to what is not decided; it is not suppressed and it is not presented as more than it is.</p>
+  <p>The sentence “these are all meromorphic solutions” appears only when a theorem of the list below gives it. With
+  symbolic parameters the answer describes generic values and lists the parameter conditions that change it, as far
+  as the engine can tell.</p>
+
+  <h2 id="levels">The verdict</h2>
+  <p>Every report starts with one of five levels.</p>
+  <div class="table-wrap"><table class="labels" id="levels-table">
+    <thead><tr><th scope="col">Level</th><th scope="col">Meaning</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+
+  <h2 id="labels">The labels</h2>
+  <p>Trust is expressed by six labels and by nothing else. Each item of a report carries one of them; the badge shows
+  its meaning when it is touched or pointed at.</p>
+  <div class="table-wrap"><table class="labels" id="labels-table">
+    <thead><tr><th scope="col">Label</th><th scope="col">Meaning</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <p>Everything that is reported is computed in exact arithmetic: rational numbers, algebraic numbers, symbols.
+  Floating-point numbers are used to find candidates and to draw pictures, never to certify.</p>
+  <p id="independent">A found solution can carry a second mark, “independent check”. The certificate of the engine is
+  the exact computation: the formula is substituted and the result is reduced to zero. The independent check is a
+  redundancy test by different code outside the engine, which substitutes the same formula again, exactly where it
+  can and otherwise numerically to 30 digits at random points of the parameter locus; it guards against an error of
+  the program and is not a second proof.</p>
+  </div>
+
+  <h2 id="theorems">The theorems</h2>
+  <p class="prose">A “ruled out” item or a statement of completeness always names one of the following theorems. For each
+  theorem: the statement, the hypotheses that the engine verifies equation by equation, the source, the label, and
+  what the theorem does not say.</p>
+  <div id="registry"><p class="muted">Loading the list of theorems…</p></div>
+
+  <div class="prose">
+  <h2 id="versions">Two versions</h2>
+  <p>The same pages exist in two versions. The <em>light</em> version is a static site: the reports of the
+  <a href="catalogue.html">catalogue</a> are computed in advance, and an equation that is typed in is analysed in the
+  browser by the engine (Python and SymPy, run by Pyodide; the first use downloads 10–15 MB). The <em>heavy</em>
+  version serves the same pages from a local server that runs the full engine with longer time limits and more
+  algebra software. Every report states the mode that produced it; a light report can contain fewer items than a heavy
+  one for the same equation, and then it says so in “Not decided”.</p>
+
+  <h2 id="limits">Limits</h2>
+  <ul>
+    <li>Only autonomous polynomial equations in one unknown function are read. An equation that becomes polynomial
+      after a standard substitution is listed in the catalogue with that substitution.</li>
+    <li>The catalogue covers orders up to six and degrees up to five, with a few named equations of order seven or
+      eight. Universal families of orders five and six with all coefficients symbolic are outside the scope.</li>
+    <li>The question is about solutions meromorphic in the whole plane. A solution that is real and smooth on the
+      real axis but has other singularities than poles in the complex plane is not covered, and the site says nothing
+      about it.</li>
+    <li>“Not decided” means: not decided by this site for this equation.</li>
+    <li>A result labelled <em>search</em> states its bound and claims nothing beyond it.</li>
+    <li>A statement labelled <em>agent-proof</em> has not been checked by a person. A statement labelled
+      <em>preprint</em> comes from a text that has not been refereed.</li>
+    <li>The engine in the browser works under a time limit; when the limit is reached the report keeps what was
+      obtained and lists the rest as not decided.</li>
+    <li>The catalogue is a sample of the literature, not a bibliography. Where a solution or an equation occurs in a
+      paper, the paper is cited; questions of priority are not discussed.</li>
+    <li>Plots are drawn with floating-point numbers. They illustrate a formula and certify nothing.</li>
+  </ul>
+  </div>
+</main>
+<footer class="site-footer">
+  <p>Data of 6 October 2026, 12:26 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
+</footer>
+
+</body>
+</html>

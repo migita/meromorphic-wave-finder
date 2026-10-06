@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="plot.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+
+<title>Catalogue of equations — Meromorphic solutions</title>
+<meta name="description" content="A catalogue of autonomous polynomial differential equations from physics, mechanics, chemistry and biology, with a precomputed report for each.">
+<script type="module" src="js/catalogue.js"></script>
+</head>
+<body data-page="catalogue">
+<a class="skip" href="#main">Skip to the content</a>
+<p class="preview" role="note">Preview — computed results carry labels; statements labelled 'agent-proof' have not been checked by a person.</p>
+<header class="site-header">
+  <a class="site-title" href="index.html">Meromorphic solutions <span>of autonomous polynomial differential equations</span></a>
+  <nav aria-label="Pages">
+    <ul>
+      <li><a href="index.html" data-nav="index">Solve</a></li>
+      <li><a href="catalogue.html" data-nav="catalogue">Catalogue</a></li>
+      <li><a href="coverage.html" data-nav="coverage">Coverage</a></li>
+      <li><a href="check.html" data-nav="check">Check a solution</a></li>
+      <li><a href="method.html" data-nav="method">Method</a></li>
+    </ul>
+  </nav>
+</header>
+<noscript><p>These pages need JavaScript: the reports are typeset and, in the static version, computed in the browser.</p></noscript>
+
+<main id="main">
+  <div id="list-view">
+    <h1>Catalogue of equations</h1>
+    <p class="prose">Equations harvested from the literature, mostly travelling-wave or stationary reductions of evolution
+    equations. Each row opens the report computed in advance for that equation. The column “weight” (1–5) says how often
+    the equation is treated in the literature on exact solutions.</p>
+    <form class="filters" id="filters" role="search" aria-label="Filter the catalogue" autocomplete="off">
+      <div><label for="f-q">Search</label><input type="search" id="f-q" placeholder="name, alias, equation"></div>
+      <div><label for="f-field">Field</label><select id="f-field"><option value="">all fields</option></select></div>
+      <div><label for="f-order">Order</label><select id="f-order"><option value="">any</option></select></div>
+      <div><label for="f-degree">Degree</label><select id="f-degree"><option value="">any</option></select></div>
+      <div><label for="f-level">Verdict</label><select id="f-level"><option value="">any</option></select></div>
+      <div><label for="f-sort">Sort by</label><select id="f-sort">
+        <option value="weight:-1">weight, highest first</option>
+        <option value="name:1">name</option>
+        <option value="order:1">order</option>
+        <option value="degree:1">degree</option>
+        <option value="level:1">verdict, most complete first</option>
+        <option value="found:-1">number found</option>
+      </select></div>
+      <div class="check"><input type="checkbox" id="f-report"><label for="f-report">with a report only</label></div>
+      <div><button type="reset" id="f-reset">Clear</button></div>
+    </form>
+    <p class="count-line" id="count" role="status" aria-live="polite"></p>
+    <div class="table-wrap">
+      <table class="cat" id="cat">
+        <thead><tr>
+          <th scope="col" data-key="name"><button type="button">Equation</button></th>
+          <th scope="col" data-key="field"><button type="button">Field</button></th>
+          <th scope="col" class="num" data-key="order"><button type="button">Order</button></th>
+          <th scope="col" class="num" data-key="degree"><button type="button">Degree</button></th>
+          <th scope="col" data-key="level"><button type="button">Verdict</button></th>
+          <th scope="col" class="num" data-key="found"><button type="button">Found</button></th>
+          <th scope="col" class="num" data-key="ruled_out"><button type="button">Ruled out</button></th>
+          <th scope="col" class="num" data-key="not_decided"><button type="button">Not decided</button></th>
+          <th scope="col" class="num" data-key="weight"><button type="button">Weight</button></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="entry-view" hidden>
+    <p class="small"><a href="catalogue.html" id="back">Back to the catalogue</a></p>
+    <div id="entry-head" class="entry-head"></div>
+    <div id="message"></div>
+    <div id="result" class="result"></div>
+  </div>
+</main>
+<footer class="site-footer">
+  <p>Data of 6 October 2026, 12:26 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
+</footer>
+
+</body>
+</html>

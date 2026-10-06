@@ -1,0 +1,198 @@
+/* plot.css — the solution plot (js/plot.js).  Uses the custom properties of app.css:
+   --bg, --fg, --muted, --rule, --panel, --accent (light and dark). */
+
+.plot {
+  margin: 0.75rem 0 0;
+  min-width: 0;
+}
+
+.plot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  align-items: flex-end;
+  margin: 0 0 0.6rem;
+}
+
+.plot-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.plot-input {
+  box-sizing: border-box;
+  width: 5.5rem;
+  max-width: 100%;
+  font: inherit;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.2rem 0.35rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.plot-input:focus-visible,
+.plot-button:focus-visible,
+.plot-svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.plot-input[aria-invalid="true"] {
+  border: 1px dashed var(--fg);
+}
+
+.plot-button {
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  padding: 0.3rem 0.6rem;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.plot-button[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.plot-button[hidden],
+.plot-message[hidden],
+.plot-legend-item[hidden] {
+  display: none;
+}
+
+.plot-figure {
+  min-width: 0;
+}
+
+.plot-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 180px;
+  overflow: visible;
+  touch-action: pan-y;
+}
+
+.plot-grid,
+.plot-axis {
+  stroke: var(--rule);
+  stroke-width: 1;
+  fill: none;
+}
+
+.plot-zero {
+  stroke: var(--muted);
+  stroke-width: 1;
+  opacity: 0.6;
+}
+
+.plot-pole {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 1 4;
+}
+
+.plot-tick {
+  font-size: 11px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plot-axis-name {
+  font-style: italic;
+}
+
+.plot-line-re {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.plot-line-im {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.75;
+  stroke-dasharray: 6 4;
+  stroke-linejoin: round;
+}
+
+.plot-cross {
+  stroke: var(--muted);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.plot-dot {
+  fill: var(--accent);
+  stroke: var(--bg);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.plot-dot-im {
+  fill: var(--muted);
+}
+
+.plot-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  align-items: center;
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.plot-key {
+  display: inline-block;
+  width: 1.4rem;
+  height: 0;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  border-top: 2px solid var(--accent);
+}
+
+.plot-key-im {
+  border-top: 2px dashed var(--muted);
+}
+
+.plot-readout {
+  margin-left: auto;
+  min-height: 1.4em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  white-space: pre-wrap;
+}
+
+.plot-caption,
+.plot-note,
+.plot-message {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.plot-message {
+  color: var(--fg);
+}
+
+@media (forced-colors: active) {
+  .plot-line-re { stroke: CanvasText; }
+  .plot-line-im, .plot-pole, .plot-cross, .plot-zero { stroke: GrayText; }
+  .plot-grid, .plot-axis { stroke: GrayText; }
+}

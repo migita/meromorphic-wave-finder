@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="plot.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+
+<title>Coverage — Meromorphic solutions</title>
+<meta name="description" content="How much of the catalogue of equations is answered, by order and degree.">
+<script type="module" src="js/coverage.js"></script>
+</head>
+<body data-page="coverage">
+<a class="skip" href="#main">Skip to the content</a>
+<p class="preview" role="note">Preview — computed results carry labels; statements labelled 'agent-proof' have not been checked by a person.</p>
+<header class="site-header">
+  <a class="site-title" href="index.html">Meromorphic solutions <span>of autonomous polynomial differential equations</span></a>
+  <nav aria-label="Pages">
+    <ul>
+      <li><a href="index.html" data-nav="index">Solve</a></li>
+      <li><a href="catalogue.html" data-nav="catalogue">Catalogue</a></li>
+      <li><a href="coverage.html" data-nav="coverage">Coverage</a></li>
+      <li><a href="check.html" data-nav="check">Check a solution</a></li>
+      <li><a href="method.html" data-nav="method">Method</a></li>
+    </ul>
+  </nav>
+</header>
+<noscript><p>These pages need JavaScript: the reports are typeset and, in the static version, computed in the browser.</p></noscript>
+
+<main id="main">
+  <h1>Coverage</h1>
+  <div class="prose">
+    <p>The universe of the site is the set of autonomous polynomial equations
+    <span class="math" data-tex="E(w, w', \dots, w^{(K)}) = 0">E(w, w′, …) = 0</span> of order
+    <span class="math" data-tex="K \le 6">K ≤ 6</span> and degree at most 5 that occur in physics, mechanics, chemistry
+    or biology, mostly as travelling-wave or stationary reductions of evolution equations. Coverage is measured on the
+    <a href="catalogue.html">catalogue</a>, which was harvested from the literature; it is not a statement about all
+    equations of a given order and degree.</p>
+    <p>A cell of the grid counts the catalogue equations of that order and degree and shows the level of the answer
+    for each of them. The levels are defined on the <a href="method.html#levels">method page</a>.</p>
+  </div>
+  <div id="notes"></div>
+  <h2 id="h-grid">Orders 1–6, degrees 2–5</h2>
+  <ul class="legend" id="legend" aria-label="Levels"></ul>
+  <div class="table-wrap"><table class="grid" id="grid" aria-labelledby="h-grid"></table></div>
+  <div id="outside"></div>
+  <h2>The catalogue as a whole</h2>
+  <div id="totals"></div>
+  <h2>By field</h2>
+  <div class="table-wrap" id="by-field"></div>
+  <h2>By weight</h2>
+  <p class="prose small muted">Weight 5: treated in hundreds of papers on exact solutions; weight 1: rarely.</p>
+  <div class="table-wrap" id="by-weight"></div>
+  <p class="small muted" id="source"></p>
+
+  <section id="types" hidden>
+    <h2 id="h-types">What the theorems say, type by type</h2>
+    <div class="prose">
+      <p>The grid above counts equations of the catalogue. This part is about all equations of a given shape. Take an
+      equation solved for the top derivative, <span data-tex="w^{(K)} = \Phi\bigl(w, \dots, w^{(K-1)}\bigr)">w^(K) = Φ</span>,
+      with <span data-tex="\Phi">Φ</span> a polynomial. At a pole of order <span data-tex="p">p</span> a monomial of
+      degree <span data-tex="n">n</span> with <span data-tex="J">J</span> derivatives has weight
+      <span data-tex="np + J">np + J</span>, and <span data-tex="w^{(K)}">w^(K)</span> has weight
+      <span data-tex="p + K">p + K</span>. The equation is of <em>type</em> <span data-tex="(K, p)">(K, p)</span> if every
+      monomial of <span data-tex="\Phi">Φ</span> has weight at most <span data-tex="p + K">p + K</span> and some nonlinear
+      monomial has weight exactly <span data-tex="p + K">p + K</span>. Those monomials form the <em>core</em>; all other
+      monomials are <em>lower terms</em>. Sub-types by the shape of the core: a <em>pure power</em>
+      <span data-tex="w^n">wⁿ</span>; <em>J1</em>, the monomial <span data-tex="w^{n-1}w'">wⁿ⁻¹w′</span> alone; a
+      <em>slice</em>, monomials of one degree with at least two derivatives (for example
+      <span data-tex="w\,w''">w w″</span> and <span data-tex="w'^2">w′²</span>); <em>mixed</em>, monomials of two or more
+      degrees.</p>
+      <p>Three levels of statement are told apart. <strong>All</strong>: true for every equation of the sub-type (core
+      coefficients nonzero, any lower terms, including none). <strong>Generic</strong>: what the engine finds for a member
+      with all lower terms present and random rational coefficients; it then holds off a proper subset of the
+      coefficient space. <strong>None</strong>: no theorem of the list gives the class of the solutions even for the
+      generic member. In the table, “W” stands for “every meromorphic solution is rational, simply periodic or
+      elliptic”, “≤ m” for “at most m poles in a period”, and “no poles” for “no meromorphic solution has a pole”.</p>
+    </div>
+    <p class="small muted" id="types-counts"></p>
+    <div class="table-wrap"><table class="grid typemap" id="typemap" aria-labelledby="h-types"></table></div>
+    <details class="block" id="subtypes">
+      <summary>The sub-types: what is guaranteed<span class="n" id="subtypes-n"></span></summary>
+      <div id="subtype-list"></div>
+    </details>
+    <h3>The catalogue by type</h3>
+    <div class="table-wrap" id="types-corpus"></div>
+    <p class="small muted" id="types-source"></p>
+  </section>
+</main>
+<footer class="site-footer">
+  <p>Data of 6 October 2026, 12:26 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
+</footer>
+
+</body>
+</html>
