@@ -3,8 +3,8 @@ import { initPage, el, fetchJSONor, text, has, isObj, arr, levelName, LEVEL_ORDE
   formulaBox, sympyToLatex, tex, markScrollable } from './common.js';
 
 const $ = id => document.getElementById(id);
-const KEYS = LEVEL_ORDER.concat(['timeout', 'no-report']);
-const nameOf = k => (k === 'no-report' ? 'no report yet' : (k === 'timeout' ? 'time limit reached' : levelName(k, true)));
+const KEYS = LEVEL_ORDER.flatMap(l => (l === 'partial' ? ['partial-record', 'partial'] : [l])).concat(['timeout', 'no-report']);
+const nameOf = k => (k === 'no-report' ? 'no report yet' : (k === 'timeout' ? 'time limit reached' : (k === 'partial-record' ? 'Partial, complete list in an earlier record' : levelName(k, true))));
 
 function bar(levels, total) {
   const lv = isObj(levels) ? levels : {};
@@ -41,7 +41,7 @@ async function main() {
   const legend = $('legend');
   for (const k of KEYS) {
     legend.append(el('li', null, el('span', { class: 'sw bar' }, el('i', { class: 'lv-' + k, style: 'width:100%' })),
-      el('span', { title: LEVELS[k] ? LEVELS[k].long : (k === 'timeout' ? 'the analysis was stopped at its time limit; there is no report' : 'in the catalogue, not yet analysed') }, nameOf(k))));
+      el('span', { title: LEVELS[k] ? LEVELS[k].long : (k === 'timeout' ? 'the analysis was stopped at its time limit; there is no report' : (k === 'partial-record' ? 'the level is partial; an earlier record of the project states a complete list, which was not used for the level' : 'in the catalogue, not yet analysed')) }, nameOf(k))));
   }
 
   const grid = isObj(cov.grid) ? cov.grid : {};
@@ -230,7 +230,7 @@ function renderTypes(doc) {
     tt.append(b2);
     box.append(tt);
   }
-  $('types-source').textContent = has(doc.generated) ? `Theorem map generated ${text(doc.generated)} from the registry of theorems and the engine (atlas/types.json).` : '';
+  $('types-source').textContent = has(doc.generated) ? `Theorem map generated ${text(doc.generated)} from the list of theorems and the engine.` : '';
 
   // links from the map open the list and scroll to the sub-type
   const go = id => { const target = id ? document.getElementById(id) : null; if (target && list.contains(target)) { $('subtypes').open = true; target.scrollIntoView({ block: 'start' }); return true; } return false; };

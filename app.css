@@ -112,7 +112,7 @@ button.quiet { border: 0; padding: .15rem .35rem; color: var(--accent); backgrou
 }
 .chips a:hover { border-color: var(--accent); color: var(--accent); }
 .syntax { font-family: var(--sans); font-size: .86rem; color: var(--muted); margin-top: .7rem; max-width: 52rem; }
-.syntax a.try { text-decoration-style: dotted; }
+.syntax a.try { text-decoration-style: dotted; white-space: nowrap; }
 .syntax a.try code { color: var(--accent); }
 
 /* ---- status line of the engine --------------------------------------------------------------------------- */
@@ -206,7 +206,9 @@ ul.verdict-rows li .meter { margin-top: .25rem; align-self: start; }
 ul.verdict-rows a.to-part { font-family: var(--sans); font-size: .84rem; white-space: nowrap; }
 .origin { font-family: var(--sans); font-size: .76rem; color: var(--muted); margin: .3rem 0 0; overflow-wrap: anywhere; }
 details.sub-report > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .9rem; font-size: 1.05rem; }
-details.sub-report > summary .sub-title { font-weight: 600; }
+details.sub-report > summary .sub-title { font-weight: 600; min-width: 0; max-width: 100%; }
+.sub-row { min-width: 0; }
+.sub-row strong .math-scroll, .sub-title .math-scroll { vertical-align: bottom; }
 details.sub-report > summary .sub-verdict { font-family: var(--serif); font-size: .95rem; font-weight: 400; flex: 1 1 22rem; min-width: 0; }
 details.sub-report > summary .sub-verdict strong { font-family: var(--sans); font-size: .9rem; }
 details.sub-report[open] { border-left: 3px solid var(--rule); padding-left: 1rem; margin-bottom: 1.4rem; }
@@ -252,6 +254,11 @@ details.detail > p { margin: .2rem 0 .4rem 1rem; }
 .item-head .ic-pass::before { content: "\2713\00a0"; }
 .item-head .ic + .badge-wrap { margin-left: 0; }
 p.degenerate { margin: .7rem 0 0; }
+.described { border-top: 1px solid var(--rule); margin-top: 1rem; padding-top: .8rem; }
+.described .sub-h { font-size: 1.02rem; margin: 0 0 .3rem; display: flex; align-items: baseline; gap: .6rem; }
+.described .sub-h .n { font-family: var(--sans); font-size: .86rem; font-weight: 400; color: var(--muted); }
+.described .item { padding-left: 1rem; border-left: 2px dotted var(--rule); margin-left: .25rem; }
+.verdict .record-line { margin: -.2rem 0 .55rem; }
 p.independent { margin: 0 0 .6rem; }
 .item .what { font-size: 1.04rem; margin: 0 0 .4rem; }
 .item p { margin: 0 0 .45rem; }
@@ -313,7 +320,7 @@ details.stratum > summary::before { content: "\25B8"; color: var(--accent); font
 details.stratum[open] > summary::before { content: "\25BE"; }
 details.stratum > summary::-webkit-details-marker { display: none; }
 details.stratum > summary { list-style: none; }
-details.stratum > summary .stratum-cond { font-weight: 600; min-width: 0; }
+details.stratum > summary .stratum-cond { font-weight: 600; min-width: 0; max-width: 100%; }
 details.stratum > summary .n { font-family: var(--sans); font-size: .84rem; color: var(--muted); }
 details.stratum > .item { padding-left: 1rem; border-left: 2px solid var(--rule); margin-left: .25rem; }
 details.stratum > .item:last-child { margin-bottom: .8rem; }
@@ -335,6 +342,7 @@ body[data-page="catalogue"]:not([data-view="entry"]) main { max-width: 82rem; }
 table.cat td.name .eq { display: block; font-size: .88rem; margin: .1rem 0; }
 table.cat td.name .eq .math-scroll { max-width: 100%; }
 table.cat td.lvl { white-space: nowrap; font-family: var(--sans); font-size: .86rem; }
+table.cat td.lvl .aka { display: block; font-size: .76rem; color: var(--muted); white-space: normal; max-width: 11rem; }
 @media (max-width: 760px) {
   /* the catalogue as a list of cards: name and equation, then one line of numbers */
   table.cat thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
@@ -369,6 +377,7 @@ table.grid td a:hover .cell-n { color: var(--accent); text-decoration: underline
 .bar i:last-child { border-right: 0; }
 .bar i.lv-complete { opacity: 1; }
 .bar i.lv-complete-W { opacity: .72; }
+.bar i.lv-partial-record { opacity: .6; background: repeating-linear-gradient(90deg, var(--accent) 0 3px, transparent 3px 5px); }
 .bar i.lv-partial { opacity: .45; }
 .bar i.lv-formal { opacity: .22; }
 .bar i.lv-unsupported { background: repeating-linear-gradient(135deg, var(--accent) 0 1px, transparent 1px 4px); opacity: .8; }

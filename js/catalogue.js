@@ -38,6 +38,7 @@ function matches(e, f) {
   if (f.degree && String(e.degree) !== f.degree) return false;
   if (f.level) {
     if (f.level === 'no-report') { if (e.has_report) return false; }
+    else if (f.level === 'partial-record') { if (!(levelOf(e) === 'partial' && e.record_complete)) return false; }
     else if (levelOf(e) !== f.level) return false;
   }
   if (f.q) {
@@ -89,7 +90,8 @@ function draw() {
       el('td', { class: 'field' }, fieldsOf(e).join(', ')),
       el('td', { class: 'num', 'data-label': 'order' }, has(e.order) ? text(e.order) : el('span', { class: 'muted' }, '–')),
       el('td', { class: 'num', 'data-label': 'degree' }, has(e.degree) ? text(e.degree) : el('span', { class: 'muted' }, '–')),
-      el('td', { class: 'lvl' }, e.has_report ? [meter(lvl), el('span', { title: LEVELS[lvl] ? LEVELS[lvl].long : '' }, levelName(lvl, true))] : el('span', { class: 'muted' }, noReportText(e))),
+      el('td', { class: 'lvl' }, e.has_report ? [meter(lvl), el('span', { title: LEVELS[lvl] ? LEVELS[lvl].long : '' }, levelName(lvl, true)),
+        lvl === 'partial' && e.record_complete ? el('span', { class: 'aka' }, 'complete list in an earlier record') : null] : el('span', { class: 'muted' }, noReportText(e))),
       cnt('found', 'found'), cnt('ruled_out', 'ruled out'), cnt('not_decided', 'not decided'),
       el('td', { class: 'num', 'data-label': 'weight' }, has(e.weight) ? text(e.weight) : el('span', { class: 'muted' }, '–'))));
   }
@@ -215,8 +217,15 @@ async function main() {
   fillSelect($('f-field'), uniq(catalogue.flatMap(fieldsOf)).sort((a, b) => a.localeCompare(b)));
   fillSelect($('f-order'), uniq(catalogue.map(e => num(e.order)).filter(v => v !== null)).sort((a, b) => a - b));
   fillSelect($('f-degree'), uniq(catalogue.map(e => num(e.degree)).filter(v => v !== null)).sort((a, b) => a - b));
-  fillSelect($('f-level'), LEVEL_ORDER.filter(l => catalogue.some(e => levelOf(e) === l)).concat(catalogue.some(e => !e.has_report) ? ['no-report'] : []),
-    l => (l === 'no-report' ? 'no report yet' : levelName(l, true)));
+  const levelOptions = [];
+  for (const l of LEVEL_ORDER) {
+    if (!catalogue.some(e => levelOf(e) === l)) continue;
+    levelOptions.push(l);
+    if (l === 'partial' && catalogue.some(e => levelOf(e) === 'partial' && e.record_complete)) levelOptions.push('partial-record');
+  }
+  if (catalogue.some(e => !e.has_report)) levelOptions.push('no-report');
+  fillSelect($('f-level'), levelOptions,
+    l => (l === 'no-report' ? 'no report yet' : (l === 'partial-record' ? 'partial, with a complete list in an earlier record' : levelName(l, true))));
   for (const [k, id] of [['q', 'f-q'], ['field', 'f-field'], ['order', 'f-order'], ['degree', 'f-degree'], ['level', 'f-level']]) {
     const v = q.get(k);
     if (has(v)) { const n = $(id); n.value = v; if (n.value !== v && n.tagName === 'SELECT') n.value = ''; }

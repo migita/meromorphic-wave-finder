@@ -9,7 +9,7 @@ function sourceNode(src) {
   if (has(src.citation)) out.push(rich(src.citation));
   if (has(src.where)) out.push(out.length ? ', ' : '', text(src.where));
   if (has(src.path)) {
-    const p = text(src.path);
+    const p = text(src.path).replace(/^doi:\s*/i, '');
     out.push(out.length ? '; ' : '');
     if (/^10\.\d{4,9}\//.test(p)) out.push(el('a', { href: 'https://doi.org/' + encodeURI(p), rel: 'noopener' }, 'doi:' + p));
     else if (/^https?:\/\//.test(p)) out.push(el('a', { href: p, rel: 'noopener' }, p));
