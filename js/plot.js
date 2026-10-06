@@ -168,11 +168,15 @@ function analyse(solution, report) {
 
   // conditions of the family: "name == expression" fixes the name; anything else is checked numerically
   const checks = [];
+  let unreadable = false;                    // a condition that cannot be read: nothing is drawn (see redraw)
   const conds = Array.isArray(sol.conditions) ? sol.conditions.filter(c => typeof c === 'string') : [];
   for (const c of conds) {
     let a;
-    try { a = parse(c); } catch (err) { continue; }
-    if (a.t !== 'rel') continue;
+    try { a = parse(c); } catch (err) {
+      // a relation may be followed by a remark in parentheses
+      try { a = parse(c.replace(/\s*\((?:[^()]|\([^()]*\))*\)\s*$/, '')); } catch (err2) { unreadable = true; continue; }
+    }
+    if (a.t !== 'rel') { unreadable = true; continue; }
     let fixed = false;
     if (a.op === '==') {
       for (const [L, R] of [[a.lhs, a.rhs], [a.rhs, a.lhs]]) {
@@ -187,7 +191,7 @@ function analyse(solution, report) {
       }
     }
     if (!fixed) {
-      try { checks.push({text: c, f: compile(a), syms: freeSymbols(a)}); } catch (err) { /* ignored */ }
+      try { checks.push({text: c, f: compile(a), syms: freeSymbols(a)}); } catch (err) { unreadable = true; }
     }
   }
 
@@ -203,7 +207,7 @@ function analyse(solution, report) {
   const state = new Map();
   const inputSet = new Set();
   let cyclic = false;
-  (function visitAll(names) {
+  function visitAll(names) {
     for (const name of names) {
       if (name === varName) continue;
       if (!defs.has(name)) { inputSet.add(name); continue; }
@@ -215,7 +219,10 @@ function analyse(solution, report) {
       state.set(name, 2);
       order.push(name);
     }
-  })(freeSymbols(ast));
+  }
+  visitAll(freeSymbols(ast));
+  // the symbols of the conditions of the family get inputs too: a curve is drawn only where the conditions hold
+  for (const c of checks) visitAll(c.syms);
   if (cyclic) return {error: 'cycle'};
 
   const dynamic = new Set();
@@ -234,7 +241,7 @@ function analyse(solution, report) {
   if (wcall) {
     try { wfun = {arg: compile(wcall.args[0]), g2: compile(wcall.args[1]), g3: compile(wcall.args[2])}; } catch (err) { wfun = null; }
   }
-  return {ast, f, varName, unknown, params, defs, order, dynamic, inputs, loose, checks, wfun,
+  return {ast, f, varName, unknown, params, defs, order, dynamic, inputs, loose, checks, unreadable, wfun,
     elliptic: sol.kind === 'elliptic' || !!wcall};
 }
 
@@ -506,6 +513,25 @@ export function plotSolution(container, solution, report, opts = {}) {
       showMessage('The formula cannot be evaluated for these constants.');
       return;
     }
+    // the family exists only where its conditions hold: otherwise nothing is drawn (the inputs stay)
+    let holds = !info.unreadable;
+    try {
+      const envCheck = ev.fullEnv(0);
+      for (const c of info.checks) {
+        if (c.syms.includes(info.varName)) continue;
+        const r = c.f(envCheck);
+        if (!r || !Number.isFinite(r[0]) || r[0] === 0) { holds = false; break; }
+      }
+    } catch (err) { holds = false; }          // a condition that cannot be evaluated counts as not satisfied
+    if (!holds) {
+      svg.textContent = '';
+      current = null;
+      readout.textContent = '';
+      caption.textContent = '';
+      notes.textContent = '';
+      showMessage('No plot: the family does not exist for these parameter values.');
+      return;
+    }
     const lat = lattice(ev);
     if (!rangeTouched) setRangeInputs(lat && lat.period ? 1.5 * lat.period : 10);
     const lo = parseValue(xminInput.value), hi = parseValue(xmaxInput.value);
@@ -613,14 +639,6 @@ export function plotSolution(container, solution, report, opts = {}) {
     notes.textContent = '';
     for (const name of info.loose) {
       if (info.inputs.includes(name)) notes.appendChild(el('p', 'plot-note', 'The constant ' + prettyName(name) + ' is not given in a form that can be evaluated here; the value entered above is used.'));
-    }
-    const envCheck = ev.fullEnv(0);
-    for (const c of info.checks) {
-      if (c.syms.includes(info.varName)) continue;
-      try {
-        const r = c.f(envCheck);
-        if (r[0] === 0) notes.appendChild(el('p', 'plot-note', 'These constants do not satisfy the condition ' + c.text + ' of this family; the curve shows the formula, not a solution.'));
-      } catch (err) { /* the condition involves symbols that are not part of the formula */ }
     }
   }
 

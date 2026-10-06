@@ -1,6 +1,6 @@
 // The catalogue: a searchable, filterable, sortable table of the corpus; a row opens the precomputed report.
 import { initPage, el, append, fetchJSONor, text, has, isObj, arr, safeId, meter, levelName, LEVEL_ORDER, LEVELS,
-  formulaBox, mathOf, symbolList, rich, sympyToLatex } from './common.js';
+  formulaBox, mathOf, symbolList, rich, sympyToLatex, tex } from './common.js';
 import { renderReport } from './render.js';
 
 const $ = id => document.getElementById(id);
@@ -8,7 +8,8 @@ let catalogue = [], registry = [];
 let sortKey = 'weight', sortDir = -1;
 
 const fieldsOf = e => arr(e.field).map(text).filter(Boolean);
-const levelOf = e => (e.has_report && has(e.verdict) ? text(e.verdict) : '');
+// the overall level (it takes the special parameter loci into account) when the report has it
+const levelOf = e => (e.has_report ? text(has(e.overall) ? e.overall : e.verdict) : '');
 const levelRank = e => { const i = LEVEL_ORDER.indexOf(levelOf(e)); return i < 0 ? 99 : i; };
 const num = v => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
 
@@ -91,6 +92,7 @@ function draw() {
       el('td', { class: 'num', 'data-label': 'order' }, has(e.order) ? text(e.order) : el('span', { class: 'muted' }, '–')),
       el('td', { class: 'num', 'data-label': 'degree' }, has(e.degree) ? text(e.degree) : el('span', { class: 'muted' }, '–')),
       el('td', { class: 'lvl' }, e.has_report ? [meter(lvl), el('span', { title: LEVELS[lvl] ? LEVELS[lvl].long : '' }, levelName(lvl, true)),
+        lvl === 'complete-generic' && has(e.special_min) ? el('span', { class: 'aka special' }, 'special loci: ' + (LEVELS[text(e.special_min)] ? levelName(text(e.special_min), true).toLowerCase() : text(e.special_min))) : null,
         lvl === 'partial' && e.record_complete ? el('span', { class: 'aka' }, 'complete list in an earlier record') : null] : el('span', { class: 'muted' }, noReportText(e))),
       cnt('found', 'found'), cnt('ruled_out', 'ruled out'), cnt('not_decided', 'not decided'),
       el('td', { class: 'num', 'data-label': 'weight' }, has(e.weight) ? text(e.weight) : el('span', { class: 'muted' }, '–'))));
@@ -162,21 +164,31 @@ async function showEntry(id) {
   const red = isObj(e.reduction) ? e.reduction : null;
   if (red || has(e.ode) || has(e.ode_latex)) {
     head.append(el('h2', null, red ? 'The reduction' : (arr(e.system).length ? 'The scalar equation' : 'The equation')));
+    // two readable lines: the ansatz, the reduced equation (and, for lumped coefficients, what they stand for);
+    // everything else (steps of the reduction, checks, type, notes) is in a collapsed block
     const block = el('div', { class: 'reduction-block' });
-    if (red) {
-      const p = el('p', null);
-      // the steps often begin by repeating the ansatz: it is printed once
-      let steps = has(red.steps) ? text(red.steps).replace(/\.\s*$/, '') : '';
-      if (has(red.ansatz) && steps.startsWith(text(red.ansatz))) steps = steps.slice(text(red.ansatz).length).replace(/^[;,.\s]+/, '');
-      if (has(red.ansatz)) append(p, ['Ansatz ', el('code', { class: 'sympy' }, text(red.ansatz)), steps ? '; ' : '. ']);
-      if (steps) append(p, [rich(steps), '. ']);
-      if (arr(red.constraints).length) append(p, ['Constraints: ', el('code', { class: 'sympy' }, arr(red.constraints).map(text).join('; ')), '.']);
-      if (p.childNodes.length) block.append(p);
-    }
+    if (red && has(red.ansatz)) block.append(el('p', { class: 'red-line' }, 'Ansatz: ', el('code', { class: 'sympy' }, text(red.ansatz))));
     const ode = has(e.ode) ? text(e.ode) : (red && has(red.ode) ? text(red.ode) : null);
     let olx = has(e.ode_latex) ? text(e.ode_latex) : null;
     if (olx && !/=/.test(olx)) olx += ' = 0';
-    if (ode || olx) block.append(formulaBox({ latex: olx, sympy: ode, hint: ode ? 'SymPy text: E, with the jets w0 = w, w1 = w′, …; the equation is E = 0' : '' }));
+    if (ode || olx) block.append(formulaBox({ latex: olx, sympy: ode }));
+    const pm = isObj(e.param_map) ? Object.entries(e.param_map).filter(([, v]) => has(v)) : [];
+    if (pm.length) {
+      const where = el('p', { class: 'where' }, 'where ');
+      // fractions in full size: the line is read on the first screen
+      const value = v => { const lx = sympyToLatex(text(v), { jets: false }); return lx !== null ? tex('\\displaystyle ' + lx) : mathOf(text(v), null, { jets: false }); };
+      pm.forEach(([k, v], i) => append(where, [i ? ', ' : '', mathOf(text(k), null, { jets: false }), ' = ', value(v)]));
+      block.append(where);
+    }
+    head.append(block);
+    const det = el('details', { class: 'entry-details' }, el('summary', null, 'Details'));
+    const body = el('div', { class: 'evidence-body' });
+    if (red) {
+      let steps = has(red.steps) ? text(red.steps).replace(/\.\s*$/, '') : '';
+      if (has(red.ansatz) && steps.startsWith(text(red.ansatz))) steps = steps.slice(text(red.ansatz).length).replace(/^[;,.\s]+/, '');
+      if (steps) body.append(el('p', { class: 'small' }, el('span', { class: 'k' }, 'Steps of the reduction: '), rich(steps), '.'));
+      if (arr(red.constraints).length) body.append(el('p', { class: 'small' }, el('span', { class: 'k' }, 'Constraints: '), el('code', { class: 'sympy' }, arr(red.constraints).map(text).join('; ')), '.'));
+    }
     const bits = [];
     if (has(e.order)) bits.push('order ' + text(e.order));
     if (has(e.degree)) bits.push('degree ' + text(e.degree));
@@ -192,10 +204,13 @@ async function showEntry(id) {
           has(ty.subtype) ? [' (', el('a', { href: 'coverage.html#' + encodeURIComponent(text(ty.subtype)) }, 'what the theorems say for this type'), ')'] : '']);
       } else if (has(ty.status)) append(line, [`; no type (K, p): ${text(ty.status)}`]);
     }
-    if (line.childNodes.length) block.append(line);
-    head.append(block);
+    if (line.childNodes.length) body.append(line);
+    if (ode) body.append(el('p', { class: 'small muted' }, 'The text form of the equation (button “SymPy”) is the expression E with the jets w0 = w, w1 = w′, …; the equation is E = 0.'));
+    if (has(e.notes)) body.append(el('p', { class: 'small muted' }, rich(e.notes)));
+    if (body.childNodes.length) { det.append(body); head.append(det); }
+  } else if (has(e.notes)) {
+    head.append(el('details', { class: 'entry-details' }, el('summary', null, 'Details'), el('p', { class: 'small muted' }, rich(e.notes))));
   }
-  if (has(e.notes)) head.append(el('p', { class: 'small muted' }, rich(e.notes)));
 
   const res = $('result'), msg = $('message');
   res.textContent = ''; msg.textContent = '';
@@ -239,12 +254,11 @@ async function main() {
   const levelOptions = [];
   for (const l of LEVEL_ORDER) {
     if (!catalogue.some(e => levelOf(e) === l)) continue;
-    levelOptions.push(l);
     if (l === 'partial' && catalogue.some(e => levelOf(e) === 'partial' && e.record_complete)) levelOptions.push('partial-record');
+    levelOptions.push(l);
   }
   if (catalogue.some(e => !e.has_report)) levelOptions.push('no-report');
-  fillSelect($('f-level'), levelOptions,
-    l => (l === 'no-report' ? 'no report yet' : (l === 'partial-record' ? 'partial, with a complete list in an earlier record' : levelName(l, true))));
+  fillSelect($('f-level'), levelOptions, l => (l === 'no-report' ? 'No report yet' : levelName(l, true)));
   for (const [k, id] of [['q', 'f-q'], ['field', 'f-field'], ['order', 'f-order'], ['degree', 'f-degree'], ['level', 'f-level']]) {
     const v = q.get(k);
     if (has(v)) { const n = $(id); n.value = v; if (n.value !== v && n.tagName === 'SELECT') n.value = ''; }

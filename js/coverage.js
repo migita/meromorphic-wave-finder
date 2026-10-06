@@ -1,10 +1,11 @@
 // Coverage page, rendered from data/coverage.json (shape: site/README.md, "coverage.json").
-import { initPage, el, fetchJSONor, text, has, isObj, arr, levelName, LEVEL_ORDER, LEVELS, LABELS, badge, rich, mathOf,
+import { initPage, el, fetchJSONor, text, has, isObj, arr, LEVELS, COUNT_KEYS, COUNT_NAMES, LABELS, badge, rich, mathOf,
   formulaBox, sympyToLatex, tex, markScrollable } from './common.js';
 
 const $ = id => document.getElementById(id);
-const KEYS = LEVEL_ORDER.flatMap(l => (l === 'partial' ? ['partial-record', 'partial'] : [l])).concat(['timeout', 'no-report']);
-const nameOf = k => (k === 'no-report' ? 'no report yet' : (k === 'timeout' ? 'time limit reached' : (k === 'partial-record' ? 'Partial, complete list in an earlier record' : levelName(k, true))));
+// the keys and their names are those of the method page (common.js: LEVELS, COUNT_KEYS, COUNT_NAMES)
+const KEYS = COUNT_KEYS;
+const nameOf = k => (LEVELS[k] ? LEVELS[k].name : (COUNT_NAMES[k] || text(k)));
 
 function bar(levels, total) {
   const lv = isObj(levels) ? levels : {};
@@ -41,7 +42,7 @@ async function main() {
   const legend = $('legend');
   for (const k of KEYS) {
     legend.append(el('li', null, el('span', { class: 'sw bar' }, el('i', { class: 'lv-' + k, style: 'width:100%' })),
-      el('span', { title: LEVELS[k] ? LEVELS[k].long : (k === 'timeout' ? 'the analysis was stopped at its time limit; there is no report' : (k === 'partial-record' ? 'the level is partial; an earlier record of the project states a complete list, which was not used for the level' : 'in the catalogue, not yet analysed')) }, nameOf(k))));
+      el('span', { title: LEVELS[k] ? LEVELS[k].long : (k === 'timeout' ? 'the analysis was stopped at its time limit; there is no report' : 'in the catalogue, not yet analysed') }, nameOf(k))));
   }
 
   const grid = isObj(cov.grid) ? cov.grid : {};

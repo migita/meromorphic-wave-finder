@@ -57,8 +57,24 @@ function matchCatalogue(eqText) {
   return catalogue.find(e => e.has_report && [e.input, e.pde, e.ode].some(t => has(t) && norm(t) === key)) || null;
 }
 
+function inputError(msg) {
+  const n = $('input-error');
+  n.textContent = msg || '';
+  n.hidden = !msg;
+}
+
 function show(report, ctx) {
   const eqText = isObj(report.input) && has(report.input.text) ? text(report.input.text) : ctx.eq;
+  // an input that cannot be read is one line under the box, not a report
+  const v = isObj(report.verdict) ? report.verdict : {};
+  if (text(v.level) === 'unsupported' && !arr(report.found).length && !arr(report.ruled_out).length && !arr(report.not_decided).length) {
+    $('result').textContent = '';
+    document.body.classList.remove('has-result');
+    inputError(has(v.text) ? text(v.text) : 'The input could not be read.');
+    window.__lastReport = report;
+    document.dispatchEvent(new CustomEvent('report-rendered', { detail: { source: ctx.source, unsupported: true } }));
+    return;
+  }
   const red = Number.isInteger(ctx.reduction) ? ctx.reduction : null;
   renderReport(report, $('result'), {
     registry, source: ctx.source,
@@ -69,6 +85,8 @@ function show(report, ctx) {
     reductionIndex: red !== null ? red : undefined,
   });
   document.body.classList.add('has-result');
+  // the answer first: the verdict box at the top of the window (below the input row)
+  requestAnimationFrame(() => { const vb = document.querySelector('#result > .verdict'); if (vb) vb.scrollIntoView({ block: 'start' }); });
   const shown = has(eqText) ? text(eqText) : '';
   document.title = (shown ? (shown.length > 70 ? shown.slice(0, 67) + '…' : shown) + ' — ' : '') + 'Meromorphic solutions';
   window.__lastReport = report;                    // for the browser test and for the console
@@ -100,6 +118,7 @@ async function run(eqText, { forceLive = false, push = true, again = false, redu
   if (push) history.pushState({ eq: eqText }, '', pageUrl({ eq: eqText, reduction: red !== null ? String(red) : null }));
   $('result').textContent = '';
   message(null);
+  inputError(null);
   const server = await engine.detectServer();
   if (my !== runNo) return;
   if (!server && !forceLive) {

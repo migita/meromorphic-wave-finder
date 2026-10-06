@@ -16,7 +16,7 @@
 </head>
 <body data-page="index">
 <a class="skip" href="#main">Skip to the content</a>
-<p class="preview" role="note">Preview — computed results carry labels; statements labelled 'agent-proof' have not been checked by a person.</p>
+<p class="preview" role="note">Preview. Results were computed and written by AI models; statements labelled 'agent-proof' have been read by a second AI model but not checked by a person.</p>
 <header class="site-header">
   <a class="site-title" href="index.html">Meromorphic solutions <span>of autonomous polynomial differential equations</span></a>
   <nav aria-label="Pages">
@@ -45,7 +45,16 @@
              placeholder="w''' = 12*w*w' + 1" aria-describedby="syntax">
       <button type="submit" class="primary" id="go">Analyse</button>
     </div>
+    <p id="input-error" class="input-error" role="alert" hidden></p>
     <ul class="chips" id="examples" aria-label="Examples"></ul>
+    <div id="status" class="status" role="status" aria-live="polite" hidden>
+      <div class="status-text">
+        <p class="now" id="status-now"></p>
+        <p class="small muted" id="status-elapsed"></p>
+        <div class="log" id="status-log" aria-label="Messages of the engine"></div>
+      </div>
+      <button type="button" id="cancel">Cancel</button>
+    </div>
   </form>
   <div class="ask-more">
     <div class="ask-options">
@@ -55,7 +64,7 @@
         <option value="60" selected>1 minute</option>
         <option value="300">5 minutes</option>
       </select>
-      <span><input type="checkbox" id="atlas" name="atlas" checked> <label for="atlas">compare with the atlas records</label></span>
+      <span><input type="checkbox" id="atlas" name="atlas" checked> <label for="atlas">compare with earlier records of the project</label></span>
       <span id="backend" class="muted"></span>
     </div>
     <p class="syntax" id="syntax">Three kinds of input:
@@ -67,19 +76,11 @@
     More on the page <a href="examples.html">Worked examples</a>.</p>
   </div>
 
-  <div id="status" class="status" role="status" aria-live="polite" hidden>
-    <div class="status-text">
-      <p class="now" id="status-now"></p>
-      <p class="small muted" id="status-elapsed"></p>
-      <div class="log" id="status-log" aria-label="Messages of the engine"></div>
-    </div>
-    <button type="button" id="cancel">Cancel</button>
-  </div>
   <div id="message"></div>
   <div id="result" class="result" aria-live="off"></div>
 </main>
 <footer class="site-footer">
-  <p>Data of 6 October 2026, 13:42 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Data of 6 October 2026, 15:46 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
   <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
 </footer>
 

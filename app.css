@@ -109,7 +109,10 @@ body.has-result .ask-sticky .chips { flex-wrap: nowrap; overflow-x: auto; paddin
 body.has-result .ask-sticky .chips a { white-space: nowrap; }
 body.has-result .ask-sticky .ask-row { flex-wrap: nowrap; }
 body.has-result .ask-sticky .ask-row input[type="text"] { flex: 1 1 8rem; }
-body[data-page="index"] .result [id] { scroll-margin-top: 8rem; }
+body[data-page="index"] .result [id], body[data-page="index"] .result > .verdict { scroll-margin-top: 8rem; }
+.input-error { font-family: var(--sans); font-size: .9rem; margin: .45rem 0 0; padding: .3rem .6rem; border-left: 3px solid var(--mark); color: var(--fg); background: var(--panel); }
+.input-error[hidden] { display: none; }
+.ask-sticky .status { margin: .5rem 0 0; }
 .ask-more { margin: 0 0 1rem; }
 .ask-row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: stretch; }
 .ask-row input[type="text"], .ask-row textarea { flex: 1 1 22rem; min-width: 0; font-size: 1.05rem; padding: .65rem .8rem; }
@@ -186,6 +189,17 @@ dl.facts dd > ul > li { margin: 0 0 .15rem; }
 .badge-search { border-style: dashed; }
 .badge-not-decided { border-style: dotted; border-color: var(--muted); color: var(--muted); }
 .badge-other { border-color: var(--rule); color: var(--muted); font-weight: 400; cursor: default; }
+/* the label of one statement, next to its chip in "Rests on" */
+.based { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .15rem .25rem; max-width: 100%; }
+.minibadge { font-family: var(--sans); font-size: .68rem; font-weight: 600; line-height: 1.15; padding: .05rem .4rem; border-radius: 999px; border: 1.5px solid var(--accent); color: var(--accent); background: var(--bg); }
+.minibadge.badge-published { background: var(--accent); color: var(--accent-fg); }
+.minibadge.badge-preprint { background: var(--accent-soft); border-width: 1.5px 1.5px 1.5px 5px; }
+.minibadge.badge-agent-proof { border-style: double; border-width: 3px; padding: 0 .35rem; }
+.minibadge.badge-search { border-style: dashed; }
+.minibadge.badge-not-decided { border-style: dotted; border-color: var(--muted); color: var(--muted); }
+.based.decisive .chip { border-color: var(--accent); border-width: 1.5px; }
+.scope-line { font-family: var(--sans); font-size: .82rem; color: var(--muted); margin: -.9rem 0 1.2rem; max-width: 60rem; }
+.mark-complex { font-family: var(--sans); font-size: .78rem; color: var(--muted); border: 1px dotted var(--muted); border-radius: 3px; padding: .03rem .4rem; white-space: normal; }
 .tip {
   display: none; position: absolute; z-index: 5; top: calc(100% + .35rem); left: 0; width: max-content; max-width: min(22rem, 80vw);
   font-family: var(--sans); font-size: .82rem; font-weight: 400; line-height: 1.4; text-align: left; white-space: normal;
@@ -198,6 +212,7 @@ dl.facts dd > ul > li { margin: 0 0 .15rem; }
 .meter { display: inline-flex; gap: 2px; vertical-align: middle; margin-right: .5rem; }
 .meter i { width: .7rem; height: .7rem; border: 1.5px solid var(--accent); border-radius: 1px; display: block; }
 .meter i.on { background: var(--accent); }
+.meter i.half { background: linear-gradient(135deg, var(--accent) 0 50%, transparent 50% 100%); }
 .verdict { border: 1px solid var(--accent); border-left-width: 6px; background: var(--accent-soft); padding: 1rem 1.2rem .9rem; margin: 1.4rem 0; border-radius: 3px; }
 .verdict-level { font-family: var(--sans); font-weight: 700; font-size: 1.02rem; margin: 0 0 .35rem; display: flex; align-items: center; flex-wrap: wrap; }
 .verdict-text { font-size: 1.12rem; margin: 0 0 .5rem; max-width: 60rem; }
@@ -206,6 +221,8 @@ dl.facts dd > ul > li { margin: 0 0 .15rem; }
 a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .verdict-unsupported, .verdict-formal { border-color: var(--muted); background: var(--panel); }
 .verdict-level .scope { font-weight: 400; font-size: .86rem; color: var(--muted); margin-left: .7rem; }
+.verdict-level { row-gap: .3rem; }
+.verdict-level .badge-wrap { margin-left: .6rem; }
 .verdict-level .scope-generic { color: var(--fg); font-weight: 600; border: 1.5px dashed var(--accent); border-radius: 3px; padding: .05rem .5rem; background: var(--bg); }
 .verdict-note { font-family: var(--sans); font-size: .86rem; color: var(--muted); margin: 0 0 .5rem; }
 .verdict-sub { margin: .8rem 0 1rem; padding: .7rem 1rem .6rem; border-left-width: 4px; }
@@ -377,6 +394,9 @@ table.cat td.lvl .aka { display: block; font-size: .76rem; color: var(--muted); 
 .entry-head h2 { font-size: 1.12rem; margin: 1.3rem 0 .4rem; }
 .entry-head h2#report { font-size: 1.3rem; margin-top: 1.8rem; border-top: 2px solid var(--fg); padding-top: .7rem; }
 .reduction-block > p { margin: 0 0 .3rem; }
+.reduction-block .where { font-size: .95rem; margin: -.2rem 0 .5rem; line-height: 2.4; max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+details.entry-details { margin: 0 0 .6rem; }
+table.cat td.lvl .aka.special { color: var(--fg); }
 .reduction-block .eq-line { color: var(--muted); font-family: var(--sans); margin: 0 0 .4rem; }
 .entry-refs { margin-top: 1.5rem; }
 ol.refs { padding-left: 1.3rem; font-size: .93rem; }
@@ -396,6 +416,7 @@ table.grid td a:hover .cell-n { color: var(--accent); text-decoration: underline
 .bar i { display: block; height: 100%; background: var(--accent); border-right: 1px solid var(--bg); }
 .bar i:last-child { border-right: 0; }
 .bar i.lv-complete { opacity: 1; }
+.bar i.lv-complete-generic { opacity: 1; background: repeating-linear-gradient(135deg, var(--accent) 0 5px, transparent 5px 6px); }
 .bar i.lv-complete-W { opacity: .72; }
 .bar i.lv-partial-record { opacity: .6; background: repeating-linear-gradient(90deg, var(--accent) 0 3px, transparent 3px 5px); }
 .bar i.lv-partial { opacity: .45; }
@@ -453,6 +474,13 @@ table.labels td:first-child { white-space: nowrap; width: 9rem; }
 .theorem h3 { margin: 0 0 .4rem; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; }
 .theorem h3 .tid { font-family: var(--mono); font-size: .82rem; font-weight: 400; color: var(--muted); }
 .theorem .statement { margin: 0 0 .6rem; }
+table.mini { font-size: .86rem; width: auto; margin: .2rem 0 .4rem; }
+table.mini th, table.mini td { padding: .2rem .8rem .2rem 0; vertical-align: top; }
+table.mini tr.more td { padding: 0 0 .55rem 1rem; }
+table.mini tr.more p.kv { margin: .1rem 0; max-width: 46rem; }
+table.mini tbody th { font-family: var(--sans); font-size: .8rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.theorem p.kv { margin: 0 0 .3rem; }
+.theorem .src-more { display: block; font-size: .88rem; }
 .theorem .remark { font-family: var(--sans); font-size: .86rem; margin: 0 0 .45rem; padding-left: .7rem; border-left: 3px solid var(--mark); }
 .theorem ul { margin: 0 0 .6rem; padding-left: 1.2rem; }
 .toc { font-family: var(--sans); font-size: .9rem; columns: 2 16rem; padding-left: 1.2rem; max-width: var(--measure); }

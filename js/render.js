@@ -120,6 +120,19 @@ function mapList(map, opts = {}) {
       : [mathOf(text(k), null, { jets: false }), ': ', el('code', { class: 'sympy' }, v)];
   }));
 }
+/** a note of the engine may end with "(change of variables: {…})", a JSON object: it is typeset, or dropped when empty */
+function noteNodes(note) {
+  const t = text(note);
+  const m = /^([\s\S]*?)\s*\(change of variables: (\{[\s\S]*\})\)\s*$/.exec(t);
+  if (!m) return rich(t);
+  let map;
+  try { map = JSON.parse(m[2]); } catch (e) { return rich(t); }
+  const entries = isObj(map) ? Object.entries(map).filter(([, v]) => has(v)) : [];
+  if (!entries.length) return rich(m[1]);
+  return [rich(m[1]), ' (change of variables: ', inlineList(entries.map(([k, v]) => el('span', null,
+    mathOf(text(k), null, { jets: false }), ' = ',
+    sympyToLatex(text(v), { jets: false }) !== null ? mathOf(text(v), null, { jets: false }) : el('code', { class: 'sympy' }, text(v))))), ')'];
+}
 /** the result of the second, independent substitution check (done by code outside the engine) as a small mark */
 function independentMark(v) {
   const t = text(v).toLowerCase().trim();
@@ -281,15 +294,20 @@ function substitutionTitle(map, name) {
 }
 function verdictSection(rep, reg, opts = {}) {
   const v = isObj(rep.verdict) ? rep.verdict : {};
-  const level = text(v.level);
+  // the level shown is the overall one (it takes the special parameter loci into account) when the report has it
+  const level = has(v.overall) ? text(v.overall) : text(v.level);
   const info = LEVELS[level];
   const scope = has(v.scope) ? text(v.scope) : '';
-  const generic = /generic/i.test(scope);
+  const generic = /generic/i.test(scope) || level === 'complete-generic';
   const sec = el('section', { class: 'verdict verdict-' + (info ? level : 'unknown') + (generic ? ' verdict-generic' : '') + (opts.sub ? ' verdict-sub' : ''), 'aria-label': 'Verdict' });
   sec.dataset.level = level;
   const line = el('p', { class: 'verdict-level' }, meter(level),
     info ? el('span', { title: info.long }, info.name) : (has(level) ? level : 'No verdict in this report'));
-  if (scope) line.append(el('span', { class: 'scope' + (generic ? ' scope-generic' : '') }, generic ? 'for generic values of the parameters only' : scope));
+  // the label of the verdict: the weakest label among the statements it needs
+  if (isLabel(v.label)) line.append(' ', badge(v.label));
+  if (level === 'complete-generic') {
+    if (has(v.special_min)) line.append(el('span', { class: 'scope scope-generic' }, 'special loci: ' + (LEVELS[text(v.special_min)] ? levelWords(v.special_min).toLowerCase() : text(v.special_min))));
+  } else if (scope) line.append(el('span', { class: 'scope' + (generic ? ' scope-generic' : '') }, generic ? 'for generic values of the parameters only' : scope));
   sec.append(line);
   if (has(v.text)) sec.append(el('p', { class: 'verdict-text' }, rich(v.text)));
   else if (info) sec.append(el('p', { class: 'verdict-text' }, info.long.charAt(0).toUpperCase() + info.long.slice(1) + '.'));
@@ -298,7 +316,7 @@ function verdictSection(rep, reg, opts = {}) {
     sec.append(el('p', { class: 'verdict-note record-line' },
       has(v.record.text) ? rich(v.record.text) : ['An earlier record of the project contains this equation: ', el('span', { class: 'chip' }, text(v.record.id)), '.'],
       isLabel(v.record.label) ? [' ', badge(v.record.label)] : null,
-      ' ', el('a', { href: `#${opts.idp || ''}atlas`, class: 'to-part' }, 'Earlier records')));
+      ' ', el('a', { href: `#${opts.idp || ''}records`, class: 'to-part' }, 'Earlier records')));
   }
   if (arr(v.conditions).length) {
     sec.append(el('p', { class: 'verdict-note' }, generic ? 'Generic means: ' : 'Under the conditions ', inlineList(condList(v.conditions, v.conditions_latex)),
@@ -325,18 +343,32 @@ function verdictSection(rep, reg, opts = {}) {
   if (rows.children.length) sec.append(rows);
   const extra = [];
   if (has(v.level_before_check)) extra.push(el('span', null, 'Before the independent check of the found list the level was: ', levelWords(v.level_before_check).toLowerCase()));
-  if (isLabel(v.label)) extra.push(el('span', null, 'Label of the verdict: ', badge(v.label)));
   if (extra.length) sec.append(el('p', { class: 'verdict-note' }, inlineList(extra, '; ')));
   const basis = arr(v.basis);
   if (basis.length) {
-    sec.append(el('p', { class: 'verdict-basis' }, 'Rests on: ', basis.flatMap(b => (typeof b === 'string' ? b.split(/\s*;\s+/) : [b])).filter(has).map(b => basisChip(b, reg.ids))));
+    // every statement the verdict rests on carries its own label; those that decide the label of the verdict are marked
+    const labels = isObj(v.labels) ? v.labels : {};
+    const decisive = new Set(arr(v.label_rests_on).map(text));
+    const items = basis.flatMap(b => (typeof b === 'string' ? b.split(/\s*;\s+/) : [b])).filter(has).map(b => {
+      const id = text(b);
+      const r = reg.byId.get(id);
+      const lab = has(labels[id]) ? text(labels[id]) : (r && has(r.label) ? text(r.label) : null);
+      const chip = basisChip(b, reg.ids);
+      if (!isLabel(lab)) return chip;
+      return el('span', { class: 'based' + (decisive.has(id) ? ' decisive' : ''), title: LABELS[lab] + (decisive.has(id) ? ' The label of the verdict comes from this statement.' : '') },
+        chip, el('span', { class: 'minibadge badge-' + lab }, lab));
+    });
+    sec.append(el('p', { class: 'verdict-basis' }, 'Rests on: ', items));
   }
   sec.addEventListener('click', ev => {
     const a = ev.target.closest ? ev.target.closest('a.to-part') : null;
     const target = a ? document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1))) : null;
     if (target) { ev.preventDefault(); reveal(target); }
   });
-  return sec;
+  if (opts.sub) return sec;
+  // one fixed line under the verdict of a report: what kind of statement this is
+  return [sec, el('p', { class: 'scope-line' }, 'This is a statement about solutions that are meromorphic in the whole complex plane. ',
+    'Travelling waves with other singularities in the complex plane — for example fronts that exist for a range of speeds, peakons, compactons — are outside its scope.')];
 }
 
 // ---- (iii) the three lists ---------------------------------------------------------------------------------
@@ -484,6 +516,7 @@ function foundItem(sol, i, rep, C, opts = {}) {
   if (has(s.kind)) head.append(el('span', { class: 'item-kind' }, KIND_NAMES[text(s.kind)] || text(s.kind)));
   if (has(s.d)) head.append(el('span', { class: 'chip', title: 'transcendence degree of the field generated by the solution and its derivatives' }, tex(`d = ${text(s.d)}`)));
   const label = has(s.label) ? text(s.label) : certLabel(s.certificate);
+  if (has(s.complex_parameters)) head.append(el('span', { class: 'mark-complex', title: 'There is no such solution for real values of the parameters.' }, text(s.complex_parameters)));
   if (has(s.independent_check)) head.append(independentMark(s.independent_check));
   if (label) head.append(badge(label, { right: true }));
   else {
@@ -542,7 +575,7 @@ function foundItem(sol, i, rep, C, opts = {}) {
     ['occurs in', arr(s.citations).length ? ulist(arr(s.citations).map(c => rich(c))) : null],
   ]);
   if (f) art.append(f);
-  if (has(s.note)) art.append(el('p', { class: 'small muted' }, rich(s.note)));
+  if (has(s.note)) art.append(el('p', { class: 'small muted' }, noteNodes(s.note)));
   const chk = checkData(rep, s);
   art.append(evidence([
     el('h4', null, 'Exact check'),
@@ -610,15 +643,29 @@ function ruledItem(item, i, rep, C) {
   return art;
 }
 
-function openItem(item, i, C) {
+// the kinds of open questions the engine names: shown as words in the head of the item, never as a raw key
+const OPEN_KINDS = { 'parameter-locus': 'special parameter values', 'entire': 'entire solutions', 'class': 'a class of solutions' };
+function openItem(item, i, C, rep) {
   const r = isObj(item) ? item : { what: text(item) };
   const art = el('article', { class: 'item item-open', id: C.idp + 'open-' + (i + 1) });
-  art.append(el('div', { class: 'item-head' }, el('span', { class: 'item-key' }, 'N' + (i + 1)), badge('not-decided', { right: true })));
+  const head = el('div', { class: 'item-head' }, el('span', { class: 'item-key' }, 'N' + (i + 1)));
+  const kind = has(r.kind) ? (OPEN_KINDS[text(r.kind)] || text(r.kind).replace(/[-_]/g, ' ')) : (r.degenerate === true ? OPEN_KINDS['parameter-locus'] : null);
+  if (kind) head.append(el('span', { class: 'item-kind' }, kind));
+  if (r.degenerate === true) head.append(el('span', { class: 'chip' }, 'the equation loses order or degree there'));
+  head.append(badge('not-decided', { right: true }));
+  art.append(head);
   art.append(el('p', { class: 'what' }, rich(has(r.what) ? r.what : '(no description)')));
   if (has(r.why)) art.append(el('p', null, el('span', { class: 'k' }, 'Why it is open: '), rich(r.why)));
-  if (has(r.partial)) art.append(el('p', null, el('span', { class: 'k' }, 'Known anyway: '), rich(r.partial)));
+  if (has(r.partial)) {
+    // the engine points to a field of the report by its key: say where the reader finds it on the page
+    const strata = isObj(rep) && arr(rep.strata).length > 0;
+    const known = typeof r.partial === 'string'
+      ? r.partial.replace(/\s*\(see the field 'strata'\)/g, strata ? ' (see “On special values of the parameters” below)' : '') : r.partial;
+    art.append(el('p', null, el('span', { class: 'k' }, 'Known anyway: '), rich(known)));
+  }
   if (arr(r.conditions).length) art.append(el('p', null, el('span', { class: 'k' }, 'For parameters with '), inlineList(condList(r.conditions, r.conditions_latex)), '.'));
-  const extra = Object.entries(r).filter(([k, val]) => !['what', 'why', 'partial', 'conditions', 'conditions_latex', 'conditions_factored'].includes(k) && has(val));
+  const extra = Object.entries(r).filter(([k, val]) => !['what', 'why', 'partial', 'conditions', 'conditions_latex', 'conditions_factored', 'kind'].includes(k) && has(val)
+    && !(val === true && (k === 'degenerate' || k === 'scope_note')));
   if (extra.length) art.append(facts(extra.map(([k, val]) => [k.replace(/_/g, ' '), genericValue(val)])));
   return art;
 }
@@ -640,7 +687,7 @@ function describedItem(o, i, C) {
     ['occurs in', arr(s.citations).length ? ulist(arr(s.citations).map(c => rich(c))) : null],
   ]);
   if (f) art.append(f);
-  if (has(s.note)) art.append(el('p', { class: 'small muted' }, rich(s.note)));
+  if (has(s.note)) art.append(el('p', { class: 'small muted' }, noteNodes(s.note)));
   if (has(s.origin)) art.append(el('p', { class: 'origin' }, 'origin: ' + text(s.origin)));
   return art;
 }
@@ -784,7 +831,7 @@ function listsSection(rep, C) {
     mk('list-ruled', 'list-ruled', 'Ruled out', 'Kinds of meromorphic solutions that cannot exist, each with its basis.',
       ruled, (it, i) => ruledItem(it, i, rep, C), 'Nothing is ruled out in this report.'),
     mk('list-open', 'list-open', 'Not decided', 'What remains open for this equation, with what is known anyway.',
-      open, (it, i) => openItem(it, i, C), 'Nothing is listed as open.'));
+      open, (it, i) => openItem(it, i, C, rep), 'Nothing is listed as open.'));
   frag.append(wrap);
   return frag;
 }
@@ -1096,6 +1143,7 @@ function rejectedSection(rep, C) {
 }
 
 // ---- (vi) atlas, theorems, details, log ----------------------------------------------------------------------------
+/** an earlier record of the project: its id, kind, kind of match, label, statement and the description of its solution */
 function atlasMatch(m) {
   const art = el('article', { class: 'item' });
   const head = el('div', { class: 'item-head' }, el('span', { class: 'item-key' }, has(m.id) ? text(m.id) : 'record'));
@@ -1107,13 +1155,6 @@ function atlasMatch(m) {
   const description = isObj(sol) ? sol.description : (typeof sol === 'string' ? sol : null);
   if (has(m.statement)) art.append(el('p', { class: 'what' }, rich(text(parseMaybe(m.statement)))));
   if (has(description)) art.append(el('p', null, rich(text(description))));
-  const change = parseMaybe(m.change);
-  const ml = mapList(change);
-  if (ml) art.append(facts([['change of variables', [ml, has(m.change_note) ? el('span', { class: 'small muted' }, text(m.change_note)) : null]]]));
-  const used = new Set(['id', 'kind', 'match', 'label', 'statement', 'change', 'change_note']);
-  const rest = Object.fromEntries(Object.entries(m).filter(([k, v]) => !used.has(k) && has(v) && !(Array.isArray(v) && !v.length) && !(isObj(v) && !Object.keys(v).length))
-    .map(([k, v]) => [k, parseMaybe(v)]));
-  if (Object.keys(rest).length) art.append(lazyRaw('Further data of the record', () => JSON.stringify(rest, null, 1)));
   return art;
 }
 
@@ -1123,16 +1164,15 @@ function atlasSection(rep) {
   const matches = arr(a.matches).map(parseMaybe).filter(isObj);
   const notes = [a.note, a.summary].filter(x => has(x) && typeof x === 'string');
   if (!matches.length && !notes.length) return null;
-  const d = el('details', { class: 'block', id: 'atlas' },
+  const d = el('details', { class: 'block', id: 'records' },
     el('summary', null, 'Earlier records', el('span', { class: 'n' }, plural(matches.length, 'record'))));
-  if (matches.length && matches.length <= 2) d.open = true;
   const body = el('div');
   body.append(el('p', { class: 'small muted' }, 'Earlier records of the project whose equation coincides with this one after an affine change of ',
     tex('w'), ' and ', tex('z'), '. Each record carries its own label.'));
   for (const n of notes) body.append(el('p', { class: 'small' }, rich(n)));
   for (const m of matches) {
     try { body.append(atlasMatch(m)); }
-    catch (e) { body.append(el('pre', { class: 'raw' }, JSON.stringify(m, null, 1))); }
+    catch (e) { body.append(el('p', { class: 'small muted' }, 'A record could not be displayed' + (has(m.id) ? ' (' + text(m.id) + ').' : '.'))); }
   }
   const und = arr(a.undecided);
   if (und.length) body.append(el('p', { class: 'small muted' }, plural(und.length, 'record') + ' could not be compared within the time limit.'));
@@ -1245,7 +1285,7 @@ export function renderReport(report, container, ctx = {}) {
   const src = [];
   if (has(ctx.source)) src.push(ctx.source);
   if (has(report.engine)) src.push('engine: ' + text(report.engine));
-  if (has(report.mode)) src.push(text(report.mode) + ' mode');
+  if (has(report.mode)) src.push((text(report.mode) === 'heavy' ? 'full' : text(report.mode)) + ' mode');
   if (has(report.elapsed_s) && Number(report.elapsed_s) > 0) src.push(Number(report.elapsed_s).toFixed(Number(report.elapsed_s) < 10 ? 1 : 0) + ' s');
   tools.append(el('span', { class: 'source' }, src.join('; ')));
   if (has(ctx.permalink)) tools.append(copyButton('Copy link', ctx.permalink, 'Copy a link to this result'));
@@ -1288,7 +1328,7 @@ export function renderReport(report, container, ctx = {}) {
     }
   });
   for (const p of parts) {
-    try { const node = p(); if (node) container.append(node); }
+    try { const node = p(); if (node) container.append(...[].concat(node).filter(Boolean)); }
     catch (e) {
       console.warn('report section failed', e);
       container.append(el('div', { class: 'notice' }, el('p', null, 'A part of the report could not be displayed (' + text(e && e.message) + '). The complete data are in the JSON download.')));

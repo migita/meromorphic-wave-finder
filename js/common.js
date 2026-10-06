@@ -4,21 +4,29 @@
 export const LABELS = {
   'published': 'A statement from a refereed publication; the citation and the statement number are given.',
   'preprint': 'A statement from a public preprint that has not been refereed; the citation and the statement number are given.',
-  'agent-proof': 'A proof written in this project and read by at least one other agent; no person has checked it.',
-  'certificate': 'An exact computation that can be rerun: script, input, expected output.',
+  'agent-proof': 'A proof written by an AI model in this project and read by at least one other; not checked by a person.',
+  'certificate': 'An exact computation that anyone can rerun.',
   'search': 'The result of a bounded search; the bound is stated; nothing is claimed beyond it.',
   'not-decided': 'Open for this equation.',
 };
 
 export const LEVELS = {
   'complete': { n: 4, name: 'Complete', long: 'every meromorphic solution is listed' },
+  'complete-generic': { n: 3.5, name: 'Complete for generic parameters',
+    long: 'every meromorphic solution is listed for generic values of the parameters; on special parameter loci the answer can be weaker, and the report says what holds there' },
   'complete-W': { n: 3, name: 'Complete among rational, simply periodic and elliptic solutions',
     short: 'Complete in the class', long: 'every rational, simply periodic or elliptic solution is listed; other meromorphic solutions are not decided' },
-  'partial': { n: 2, name: 'Partial', long: 'solutions were found; completeness is not known in any class' },
+  'partial-record': { n: 2.5, name: 'Partial, with a complete list in an earlier record',
+    long: 'the level is partial; an earlier record of the project states a complete list, which was not used for the level' },
+  'partial': { n: 2, name: 'Partial', long: 'solutions were found; the list is not known to be complete, and the report says what is not decided' },
   'formal': { n: 1, name: 'Local analysis only', long: 'only local data: pole orders, Fuchs indices, compatibility conditions' },
   'unsupported': { n: 0, name: 'Not supported', long: 'the input is outside what the engine reads' },
 };
-export const LEVEL_ORDER = ['complete', 'complete-W', 'partial', 'formal', 'unsupported'];
+// the levels a verdict can have (verdict.overall, or verdict.level in older reports) ...
+export const LEVEL_ORDER = ['complete', 'complete-generic', 'complete-W', 'partial', 'formal', 'unsupported'];
+// ... and the keys under which the catalogue and the coverage page count the entries (defined on the method page)
+export const COUNT_KEYS = ['complete', 'complete-generic', 'complete-W', 'partial-record', 'partial', 'formal', 'unsupported', 'timeout', 'no-report'];
+export const COUNT_NAMES = { 'timeout': 'Time limit reached', 'no-report': 'No report yet' };
 
 // ---- DOM ---------------------------------------------------------------------------------------------------
 export function el(tag, attrs, ...children) {
@@ -192,7 +200,7 @@ export function meter(level) {
   const info = LEVELS[level];
   const n = info ? info.n : 0;
   const m = el('span', { class: 'meter', role: 'img', 'aria-label': info ? `level ${n} of 4` : 'no level' });
-  for (let i = 0; i < 4; i++) m.append(el('i', { class: i < n ? 'on' : '' }));
+  for (let i = 0; i < 4; i++) m.append(el('i', { class: i + 1 <= n ? 'on' : (i < n ? 'half' : '') }));
   return m;
 }
 export function levelName(level, short = false) {

@@ -16,7 +16,7 @@
 </head>
 <body data-page="method">
 <a class="skip" href="#main">Skip to the content</a>
-<p class="preview" role="note">Preview — computed results carry labels; statements labelled 'agent-proof' have not been checked by a person.</p>
+<p class="preview" role="note">Preview. Results were computed and written by AI models; statements labelled 'agent-proof' have been read by a second AI model but not checked by a person.</p>
 <header class="site-header">
   <a class="site-title" href="index.html">Meromorphic solutions <span>of autonomous polynomial differential equations</span></a>
   <nav aria-label="Pages">
@@ -41,6 +41,7 @@
   whole complex plane, as far as this can be decided, and says what each statement rests on.</p>
 
   <ul class="toc">
+    <li><a href="#who">Who made this</a></li>
     <li><a href="#question">The question</a></li>
     <li><a href="#kinds">Rational, simply periodic, elliptic</a></li>
     <li><a href="#d">The number d</a></li>
@@ -53,6 +54,13 @@
     <li><a href="#versions">Two versions</a></li>
     <li><a href="#limits">Limits</a></li>
   </ul>
+
+  <h2 id="who">Who made this</h2>
+  <p>The results on this site were computed and written by AI models: the engine, the proofs labelled
+  <em>agent-proof</em>, the catalogue and these pages. A statement labelled <em>agent-proof</em> has been read by a
+  second AI model and has not been checked by a person.<span id="who-unread"></span> Statements labelled <em>published</em> or <em>preprint</em>
+  are quoted from the works cited with them. A <em>certificate</em> is an exact computation that anyone can rerun,
+  for instance on the page <a href="check.html">Check a solution</a>.</p>
 
   <h2 id="question">The question</h2>
   <p>The unknown is a function <span data-tex="w(z)">w(z)</span> of a complex variable. The equation is</p>
@@ -68,6 +76,10 @@
   except for poles. Entire functions (no poles at all) and constants are included. Solutions with branch points or
   essential singularities at finite points, and solutions that exist only on a part of the plane, are not the subject
   of the site.</p>
+  <p id="scope">Every verdict is therefore a statement about solutions that are meromorphic in the whole complex plane.
+  Travelling waves with other singularities in the complex plane — for example fronts that exist for a range of
+  speeds, peakons, compactons — are outside its scope: “complete” means that all meromorphic solutions are listed,
+  not that all travelling waves are.</p>
   <p>For an evolution equation in <span data-tex="u(x,t)">u(x,t)</span> the travelling-wave reduction
   <span data-tex="u = w(z),\ z = x - ct">u = w(z), z = x − ct</span> is applied first and, where possible, integrated;
   the constants of integration become parameters. The result page shows the reduction that was applied.</p>
@@ -134,15 +146,22 @@
   as the engine can tell.</p>
 
   <h2 id="levels">The verdict</h2>
-  <p>Every report starts with one of five levels.</p>
+  <p>Every report starts with a level. Where the parameters of an equation matter, the level takes the special
+  parameter loci into account: “complete for generic parameters” says that the list is complete off those loci, and
+  the report states the weakest level reached on them.</p>
   <div class="table-wrap"><table class="labels" id="levels-table">
     <thead><tr><th scope="col">Level</th><th scope="col">Meaning</th></tr></thead>
     <tbody></tbody>
   </table></div>
 
+  <p>On the pages <a href="catalogue.html">Catalogue</a> and <a href="coverage.html">Coverage</a> an entry without
+  a report is counted as “no report yet”, or as “time limit reached” when its analysis was stopped at the time limit.</p>
+
   <h2 id="labels">The labels</h2>
   <p>Trust is expressed by six labels and by nothing else. Each item of a report carries one of them; the badge shows
-  its meaning when it is touched or pointed at.</p>
+  its meaning when it is touched or pointed at. A verdict carries the weakest label among the statements it needs
+  (agent-proof is weaker than preprint, preprint weaker than published, published weaker than certificate), and
+  each of those statements is shown with its own label.</p>
   <div class="table-wrap"><table class="labels" id="labels-table">
     <thead><tr><th scope="col">Label</th><th scope="col">Meaning</th></tr></thead>
     <tbody></tbody>
@@ -193,7 +212,7 @@
   </div>
 </main>
 <footer class="site-footer">
-  <p>Data of 6 October 2026, 13:42 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Data of 6 October 2026, 15:46 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
   <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
 </footer>
 
