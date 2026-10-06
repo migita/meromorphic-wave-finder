@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="plot.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+
+<title>Worked examples — Meromorphic solutions</title>
+<meta name="description" content="Six equations with the kind of answer each one gets: a complete list, a solution with d = 2, an envelope reduction, a substitution, a partial answer, Painlevé transcendents.">
+<script type="module" src="js/examples.js"></script>
+</head>
+<body data-page="examples">
+<a class="skip" href="#main">Skip to the content</a>
+<p class="preview" role="note">Preview — computed results carry labels; statements labelled 'agent-proof' have not been checked by a person.</p>
+<header class="site-header">
+  <a class="site-title" href="index.html">Meromorphic solutions <span>of autonomous polynomial differential equations</span></a>
+  <nav aria-label="Pages">
+    <ul>
+      <li><a href="index.html" data-nav="index">Solve</a></li>
+      <li><a href="examples.html" data-nav="examples">Examples</a></li>
+      <li><a href="catalogue.html" data-nav="catalogue">Catalogue</a></li>
+      <li><a href="coverage.html" data-nav="coverage">Coverage</a></li>
+      <li><a href="check.html" data-nav="check">Check a solution</a></li>
+      <li><a href="method.html" data-nav="method">Method</a></li>
+    </ul>
+  </nav>
+</header>
+<noscript><p>These pages need JavaScript: the reports are typeset and, in the static version, computed in the browser.</p></noscript>
+
+<main id="main">
+  <h1>Worked examples</h1>
+  <p class="prose">Six equations, each with the kind of answer it gets. A link opens the result on the page
+  <a href="index.html">Solve</a>; where the catalogue has no report for the exact text, the engine computes it, in the
+  browser or on the server.</p>
+  <div class="examples">
+    <article class="example" id="ex-ks">
+      <h2>Kuramoto–Sivashinsky</h2>
+      <p class="ex-formula"><span data-tex="u_t + u\,u_x + u_{xx} + u_{xxxx} = 0" data-display>u_t + u*u_x + u_xx + u_xxxx = 0</span></p>
+      <p>A published theorem gives the class of all meromorphic solutions of the travelling-wave equation (rational, simply periodic or elliptic, with one pole in a period), and the list within that class is complete: the constants and two simply periodic families.</p>
+      <p class="ex-link"><a href="index.html?eq=u_t+%2B+u%2Au_x+%2B+u_xx+%2B+u_xxxx+%3D+0" data-eq="u_t + u*u_x + u_xx + u_xxxx = 0">Open the result</a> <span class="small muted">typed as <code>u_t + u*u_x + u_xx + u_xxxx = 0</code></span></p>
+    </article>
+    <article class="example" id="ex-fisher">
+      <h2>Fisher at the speed 5/√6</h2>
+      <p class="ex-formula"><span data-tex="w'' + \tfrac{5}{\sqrt6}\,w' + w - w^2 = 0" data-display>w'' + 5/sqrt(6) w' + w - w^2 = 0</span></p>
+      <p>At this speed the travelling-wave equation has, besides the constants and a simply periodic family, a family of solutions with d = 2: an exponential times a Weierstrass function of an exponential.</p>
+      <p class="ex-link"><a href="index.html?eq=w%27%27+%2B+5%2Fsqrt%286%29+w%27+%2B+w+-+w%5E2+%3D+0" data-eq="w'' + 5/sqrt(6) w' + w - w^2 = 0">Open the result</a> <span class="small muted">typed as <code>w'' + 5/sqrt(6) w' + w - w^2 = 0</code></span></p>
+    </article>
+    <article class="example" id="ex-nls">
+      <h2>A nonlinear Schrödinger equation</h2>
+      <p class="ex-formula"><span data-tex="i\,q_t + q_{xx} + g\,|q|^2 q = 0" data-display>i q_t + q_xx + g |q|^2 q = 0</span></p>
+      <p>Typed as an evolution equation for a complex field: the envelope reduction q = w(z)·exp(iθ) leads to a real equation of second order with a cubic term, and all its meromorphic solutions are listed.</p>
+      <p class="ex-link"><a href="index.html?eq=i+q_t+%2B+q_xx+%2B+g+%7Cq%7C%5E2+q+%3D+0" data-eq="i q_t + q_xx + g |q|^2 q = 0">Open the result</a> <span class="small muted">typed as <code>i q_t + q_xx + g |q|^2 q = 0</code></span></p>
+    </article>
+    <article class="example" id="ex-phi6">
+      <h2>The φ⁶ equation</h2>
+      <p class="ex-formula"><span data-tex="w'' = a\,w + b\,w^3 + c\,w^5" data-display>w'' = a w + b w^3 + c w^5</span></p>
+      <p>For c ≠ 0 the only meromorphic solutions are constants; the square u = w² satisfies an equation that has nonconstant meromorphic solutions, and the result lists them.</p>
+      <p class="ex-link"><a href="index.html?eq=w%27%27+%3D+a+w+%2B+b+w%5E3+%2B+c+w%5E5" data-eq="w'' = a w + b w^3 + c w^5">Open the result</a> <span class="small muted">typed as <code>w'' = a w + b w^3 + c w^5</code></span></p>
+    </article>
+    <article class="example" id="ex-sh">
+      <h2>Swift–Hohenberg, stationary</h2>
+      <p class="ex-formula"><span data-tex="w'''' + 2\,w'' + (1 - r)\,w + w^3 = 0" data-display>w'''' + 2 w'' + (1 - r) w + w^3 = 0</span></p>
+      <p>Every meromorphic solution is rational, simply periodic or elliptic with at most two poles in a period; the engine in the browser lists those with one pole and reports those with two as not computed.</p>
+      <p class="ex-link"><a href="index.html?eq=w%27%27%27%27+%2B+2+w%27%27+%2B+%281+-+r%29+w+%2B+w%5E3+%3D+0" data-eq="w'''' + 2 w'' + (1 - r) w + w^3 = 0">Open the result</a> <span class="small muted">typed as <code>w'''' + 2 w'' + (1 - r) w + w^3 = 0</code></span></p>
+    </article>
+    <article class="example" id="ex-p1">
+      <h2>A forced Korteweg–de Vries wave</h2>
+      <p class="ex-formula"><span data-tex="w''' = 12\,w\,w' + 1" data-display>w''' = 12 w w' + 1</span></p>
+      <p>Every solution with a pole is a first Painlevé transcendent, so d = 3: the result describes these solutions through an earlier record and gives no closed form.</p>
+      <p class="ex-link"><a href="index.html?eq=w%27%27%27+%3D+12+w+w%27+%2B+1" data-eq="w''' = 12 w w' + 1">Open the result</a> <span class="small muted">typed as <code>w''' = 12 w w' + 1</code></span></p>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <p>Data of 6 October 2026, 13:42 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
+</footer>
+
+</body>
+</html>

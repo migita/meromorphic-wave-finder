@@ -47,7 +47,7 @@ const hooks = {
 };
 
 // reports computed in this session (the engine in the browser is slow; a repeated request is answered at once)
-function cacheKey(eqText, options) { return 'mero-report:' + norm(eqText) + '|' + (options.atlas === false ? 'noatlas' : 'atlas'); }
+function cacheKey(eqText, options) { return 'mero-report:' + norm(eqText) + '|' + (options.atlas === false ? 'noatlas' : 'atlas') + (Number.isInteger(options.reduction_index) ? '|r' + options.reduction_index : ''); }
 function cacheGet(key) { try { const s = sessionStorage.getItem(key); return s ? JSON.parse(s) : null; } catch { return null; } }
 function cachePut(key, value) { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch { /* full or unavailable: no cache */ } }
 
@@ -59,11 +59,16 @@ function matchCatalogue(eqText) {
 
 function show(report, ctx) {
   const eqText = isObj(report.input) && has(report.input.text) ? text(report.input.text) : ctx.eq;
+  const red = Number.isInteger(ctx.reduction) ? ctx.reduction : null;
   renderReport(report, $('result'), {
     registry, source: ctx.source,
-    permalink: ctx.id ? pageUrl({ id: ctx.id }) : (has(ctx.eq) ? pageUrl({ eq: ctx.eq }) : null),
+    permalink: ctx.id ? pageUrl({ id: ctx.id }) : (has(ctx.eq) ? pageUrl({ eq: ctx.eq, reduction: red !== null ? String(red) : null }) : null),
     filename: 'report-' + safeId(ctx.id || (eqText || 'equation')).slice(0, 60),
+    // another reduction of the same input: the analysis is run again with the engine option reduction_index
+    onReduction: has(ctx.eq) ? (i => run(ctx.eq, { forceLive: true, reduction: i })) : null,
+    reductionIndex: red !== null ? red : undefined,
   });
+  document.body.classList.add('has-result');
   const shown = has(eqText) ? text(eqText) : '';
   document.title = (shown ? (shown.length > 70 ? shown.slice(0, 67) + '…' : shown) + ' — ' : '') + 'Meromorphic solutions';
   window.__lastReport = report;                    // for the browser test and for the console
@@ -84,13 +89,15 @@ async function showPrecomputed(entry, eqText) {
   return true;
 }
 
-async function run(eqText, { forceLive = false, push = true, again = false } = {}) {
+async function run(eqText, { forceLive = false, push = true, again = false, reduction = null } = {}) {
   eqText = text(eqText).trim();
   if (!eqText) { message(notice(el('p', null, 'Enter an equation, or choose one of the examples.'), 'plain')); return; }
   const my = ++runNo;
   if (engine.busy()) engine.cancel();
   $('eq').value = eqText;
-  if (push) history.pushState({ eq: eqText }, '', pageUrl({ eq: eqText }));
+  const red = Number.isInteger(reduction) && reduction >= 0 ? reduction : null;
+  if (red !== null) forceLive = true;               // a chosen reduction is always computed, never taken from the catalogue
+  if (push) history.pushState({ eq: eqText }, '', pageUrl({ eq: eqText, reduction: red !== null ? String(red) : null }));
   $('result').textContent = '';
   message(null);
   const server = await engine.detectServer();
@@ -103,12 +110,13 @@ async function run(eqText, { forceLive = false, push = true, again = false } = {
   const budget = Number($('budget').value) || 60;
   const options = { budget_s: budget };
   if (!$('atlas').checked) options.atlas = false;
+  if (red !== null) options.reduction_index = red;
   const key = cacheKey(eqText, options);
   const kept = !server && !again ? cacheGet(key) : null;
   if (kept && isObj(kept.report) && Number(kept.budget) >= budget) {
-    show(kept.report, { source: 'Computed in your browser earlier in this session', eq: eqText });
+    show(kept.report, { source: 'Computed in your browser earlier in this session', eq: eqText, reduction: red });
     const redo = el('button', { type: 'button', class: 'quiet' }, 'compute it again');
-    redo.addEventListener('click', () => run(eqText, { forceLive: true, push: false, again: true }));
+    redo.addEventListener('click', () => run(eqText, { forceLive: true, push: false, again: true, reduction: red }));
     message(notice(el('p', null, 'This is the report computed earlier in this session. You can also ', redo, '.'), 'plain'));
     return;
   }
@@ -118,7 +126,7 @@ async function run(eqText, { forceLive = false, push = true, again = false } = {
     const { report, backend, info } = await engine.analyze(eqText, options, hooks);
     if (my !== runNo) return;
     if (backend === 'browser' && isObj(report)) cachePut(key, { report, budget });
-    show(report, { source: backend === 'server' ? (report && report.cached ? 'Computed by the server (answer from its cache)' : 'Computed by the server') : 'Computed in your browser', eq: eqText });
+    show(report, { source: backend === 'server' ? (report && report.cached ? 'Computed by the server (answer from its cache)' : 'Computed by the server') : 'Computed in your browser', eq: eqText, reduction: red });
     if (backend === 'browser' && info) noteBackend(`engine in the browser (Pyodide ${text(info.pyodide)}, Python ${text(info.python)}, SymPy ${text(info.sympy)})`);
   } catch (e) {
     if (my !== runNo) return;
@@ -155,7 +163,7 @@ async function route() {
       message(notice(el('p', null, `There is no precomputed report with the identifier “${id}”. `, el('a', { href: 'catalogue.html' }, 'Open the catalogue'), '.')));
     }
   } else if (has(eq)) {
-    await run(eq, { push: false, forceLive: q.get('engine') === 'live' });
+    await run(eq, { push: false, forceLive: q.get('engine') === 'live', reduction: /^\d+$/.test(q.get('reduction') || '') ? Number(q.get('reduction')) : null });
   }
 }
 

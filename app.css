@@ -99,8 +99,18 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.primary:hover { filter: brightness(1.1); color: var(--accent-fg); }
 button[disabled] { opacity: .55; cursor: default; }
 button.quiet { border: 0; padding: .15rem .35rem; color: var(--accent); background: none; font-size: .8rem; text-decoration: underline; text-underline-offset: .15em; }
-.ask { margin: 1.2rem 0 1rem; }
-.ask label.main { display: block; font-family: var(--serif); font-size: 1.05rem; margin-bottom: .45rem; }
+.ask { margin: 0 0 .4rem; }
+.main-label { display: block; font-family: var(--serif); font-size: 1.05rem; margin: 1.2rem 0 .2rem; }
+/* the input row and the examples stay at the top of the window while a result is read */
+.ask-sticky { position: sticky; top: 0; z-index: 6; background: var(--bg); padding: .45rem 0 .5rem; }
+.ask-sticky .chips { margin-top: .55rem; }
+body.has-result .ask-sticky { border-bottom: 1px solid var(--rule); }
+body.has-result .ask-sticky .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .15rem; scrollbar-width: thin; }
+body.has-result .ask-sticky .chips a { white-space: nowrap; }
+body.has-result .ask-sticky .ask-row { flex-wrap: nowrap; }
+body.has-result .ask-sticky .ask-row input[type="text"] { flex: 1 1 8rem; }
+body[data-page="index"] .result [id] { scroll-margin-top: 8rem; }
+.ask-more { margin: 0 0 1rem; }
 .ask-row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: stretch; }
 .ask-row input[type="text"], .ask-row textarea { flex: 1 1 22rem; min-width: 0; font-size: 1.05rem; padding: .65rem .8rem; }
 .ask-options { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: center; margin-top: .6rem; font-family: var(--sans); font-size: .86rem; color: var(--muted); }
@@ -254,6 +264,11 @@ details.detail > p { margin: .2rem 0 .4rem 1rem; }
 .item-head .ic-pass::before { content: "\2713\00a0"; }
 .item-head .ic + .badge-wrap { margin-left: 0; }
 p.degenerate { margin: .7rem 0 0; }
+.real-form-h { font-family: var(--sans); font-size: .86rem; font-weight: 600; margin: .5rem 0 0; }
+.reduction { margin: 0 0 .6rem; }
+.reduction > p { margin: 0 0 .4rem; }
+.reduction-choice { font-family: var(--sans); font-size: .9rem; }
+.reduction-choice select { max-width: 100%; }
 .described { border-top: 1px solid var(--rule); margin-top: 1rem; padding-top: .8rem; }
 .described .sub-h { font-size: 1.02rem; margin: 0 0 .3rem; display: flex; align-items: baseline; gap: .6rem; }
 .described .sub-h .n { font-family: var(--sans); font-size: .86rem; font-weight: 400; color: var(--muted); }
@@ -359,6 +374,11 @@ table.cat td.lvl .aka { display: block; font-size: .76rem; color: var(--muted); 
 }
 .entry-head h1 { margin-bottom: .2rem; }
 .entry-head .aka { font-family: var(--sans); color: var(--muted); font-size: .92rem; margin: 0 0 .8rem; }
+.entry-head h2 { font-size: 1.12rem; margin: 1.3rem 0 .4rem; }
+.entry-head h2#report { font-size: 1.3rem; margin-top: 1.8rem; border-top: 2px solid var(--fg); padding-top: .7rem; }
+.reduction-block > p { margin: 0 0 .3rem; }
+.reduction-block .eq-line { color: var(--muted); font-family: var(--sans); margin: 0 0 .4rem; }
+.entry-refs { margin-top: 1.5rem; }
 ol.refs { padding-left: 1.3rem; font-size: .93rem; }
 ol.refs li { margin-bottom: .3rem; }
 
@@ -390,6 +410,13 @@ table.grid td a:hover .cell-n { color: var(--accent); text-decoration: underline
 .legend li { display: flex; align-items: center; gap: .4rem; }
 .legend .sw { width: 1.3rem; height: .65rem; margin: 0; flex: none; }
 
+table.demand td, table.demand th { vertical-align: top; }
+table.demand td:first-child code { white-space: normal; overflow-wrap: anywhere; }
+table.demand td:first-child { max-width: 19rem; }
+table.demand td:nth-child(2) { max-width: 17rem; font-size: .88rem; }
+table.demand td.num { white-space: nowrap; }
+table.demand details summary { font-size: .8rem; }
+#demand-classes { min-width: 46rem; }
 table.typemap { min-width: 68rem; table-layout: fixed; }
 table.typemap thead th:first-child { width: 7.5rem; white-space: normal; }
 ul.subs li a.to-sub, ul.subs li .st-line { display: block; }
@@ -406,6 +433,17 @@ ul.subs li a { color: inherit; }
 ul.subs li .lvl { color: var(--muted); }
 .subtype h3 { font-size: 1rem; }
 .chips-line { margin-top: .3rem; line-height: 2; }
+
+/* ---- worked examples ------------------------------------------------------------------------------------- */
+.examples { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 0 2.5rem; max-width: 64rem; }
+.example { border-top: 1px solid var(--rule); padding: 1rem 0 .6rem; }
+.example h2 { font-size: 1.12rem; margin: 0 0 .4rem; }
+.example .ex-formula { margin: 0 0 .5rem; overflow-x: auto; overflow-y: hidden; position: relative; }
+.example .ex-formula .katex-display { margin: 0; text-align: left; }
+.example .ex-formula .katex-display > .katex { text-align: left; }
+.example p { margin: 0 0 .5rem; }
+.example .ex-link a { font-family: var(--sans); font-size: .92rem; font-weight: 600; }
+.example .ex-link code { overflow-wrap: anywhere; }
 
 /* ---- method ---------------------------------------------------------------------------------------------- */
 .prose h2 { margin-top: 2.2em; }

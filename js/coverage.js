@@ -89,9 +89,81 @@ async function main() {
   if (arr(c.by_weight).length) $('by-weight').append(levelTable(arr(c.by_weight).filter(isObj), 'Weight', 'weight'));
   else $('by-weight').append(el('p', { class: 'muted' }, 'No data.'));
   if (has(cov.source)) $('source').textContent = 'Source of these numbers: ' + text(cov.source) + '.';
+  try { renderDemand(await fetchJSONor('data/demand.json', null)); }
+  catch (e) { console.warn('demand table failed', e); $('demand').hidden = true; }
   try { renderTypes(await fetchJSONor('data/types.json', null)); }
   catch (e) { console.warn('theorem map failed', e); $('types').hidden = true; }
   document.documentElement.dataset.ready = '1';
+}
+
+// ---- the demand table of the corpus census: data/demand.json, made by build.py from corpus/demand_C.md --------
+const pct = (a, b) => (has(a) ? `${Number(a).toFixed(1)} %` + (has(b) ? ` (${Number(b).toFixed(1)} %)` : '') : '');
+function renderDemand(doc) {
+  const sec = $('demand');
+  if (!isObj(doc) || !(doc.parsed || has(doc.html_a) || has(doc.html_b))) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const works = isObj(doc.works) ? doc.works : {};
+  const idx = Object.keys(works);
+  const names = { s2: 'Semantic Scholar', doaj: 'DOAJ' };
+  const intro = [];
+  if (has(doc.neutral)) intro.push(text(doc.neutral) + ' ');
+  if (has(doc.method)) intro.push(text(doc.method) + ' ');
+  if (idx.length) intro.push('Works counted: ' + idx.map(k => `${works[k]} (${names[k] || k})`).join(' and ') + (idx.length > 1 ? `; the shares of the second count are in brackets.` : '.'));
+  $('demand-method').textContent = intro.join('');
+  if (has(doc.method_full)) { const d = $('demand-method-full'); d.hidden = false; d.querySelector('p').textContent = text(doc.method_full); }
+  const ta = $('demand-classes'), tb2 = $('demand-orders');
+  if (!doc.parsed) {
+    // the tables as HTML made at build time from the markdown file (cells escaped there)
+    if (has(doc.html_a)) ta.parentNode.innerHTML = doc.html_a;
+    if (has(doc.html_b)) tb2.parentNode.innerHTML = doc.html_b;
+    return;
+  }
+  const rows = arr(doc.classes).filter(isObj);
+  const classes = rows.filter(r => r.group === 'class'), family = rows.filter(r => r.group === 'family'), uncl = rows.filter(r => r.group === 'unclassified');
+  ta.append(el('caption', null, 'Classes of travelling-wave equations, after the standard integrations, by their share of the works; for each class, the levels of the answers for the catalogue equations of that class.'),
+    el('thead', null, el('tr', null, el('th', { scope: 'col' }, 'Equation (class)'), el('th', { scope: 'col' }, 'Name'),
+      el('th', { scope: 'col', class: 'num' }, 'Share of the works'), el('th', { scope: 'col', style: 'min-width:13rem' }, 'In the catalogue: levels of the answers'))));
+  const tb = el('tbody');
+  for (const c of classes) {
+    const members = arr(c.members).filter(isObj);
+    const cell = el('td');
+    if (!members.length) cell.append(el('span', { class: 'cell-empty' }, 'no entry'));
+    else {
+      cell.append(el('span', { class: 'cell-n' }, String(members.length), ' ', el('small', null, members.length === 1 ? 'equation' : 'equations')), ...bar(c.levels, members.length));
+      const d = el('details', null, el('summary', null, 'the equations'));
+      d.append(el('p', { class: 'small' }, members.map((m, i) => [i ? ', ' : '', el('a', { href: 'catalogue.html?id=' + encodeURIComponent(text(m.id)), title: nameOf(text(m.level)) }, text(m.name || m.id))])));
+      cell.append(d);
+    }
+    tb.append(el('tr', null, el('td', null, el('code', { class: 'sympy' }, text(c.class))), el('td', null, text(c.name)),
+      el('td', { class: 'num' }, pct(c.share, c.share_second)), cell));
+  }
+  ta.append(tb);
+  const rest = $('demand-rest');
+  rest.textContent = '';
+  const sum = (xs, k) => xs.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+  rest.append(el('p', { class: 'small' }, `The classes above account for ${pct(sum(classes, 'share'), sum(classes, 'share_second'))} of the works.`));
+  if (family.length) {
+    rest.append(el('details', null, el('summary', null, `Works that name a family but no identified equation: ${pct(sum(family, 'share'), sum(family, 'share_second'))}`),
+      el('ul', { class: 'small' }, family.map(f => el('li', null, text(f.name).replace(/^(generic|tail):\s*/, '') + ': ' + pct(f.share, f.share_second))))));
+  }
+  for (const u of uncl) rest.append(el('p', { class: 'small' }, `Unclassified: ${pct(u.share, u.share_second)}. `, el('span', { class: 'muted' }, text(u.name))));
+
+  const orders = arr(doc.orders).filter(isObj);
+  if (orders.length) {
+    const label = { '<= 2': 'order at most 2', '3-4': 'orders 3 and 4', '>= 5': 'order 5 or more', 'unclassified': 'unclassified' };
+    tb2.append(el('thead', null, el('tr', null, el('th', { scope: 'col' }, 'Order of the equation'),
+      orders.flatMap(o => [el('th', { scope: 'col', class: 'num' }, `${names[o.index] || o.index}: works`), el('th', { scope: 'col', class: 'num' }, 'of all'), el('th', { scope: 'col', class: 'num' }, 'of the classified')]))));
+    const b = el('tbody');
+    arr(orders[0].rows).forEach((r0, i) => {
+      b.append(el('tr', null, el('th', { scope: 'row' }, label[r0.order] || text(r0.order)),
+        orders.flatMap(o => { const r = arr(o.rows)[i] || {}; return [el('td', { class: 'num' }, has(r.works) ? text(r.works) : ''), el('td', { class: 'num' }, has(r.of_all) ? pct(r.of_all) : ''), el('td', { class: 'num' }, has(r.of_classified) ? pct(r.of_classified) : '–')]; })));
+    });
+    tb2.append(b);
+    const oc = k => arr(orders[0].rows).find(r => r.order === k), oc2 = k => (orders[1] ? arr(orders[1].rows).find(r => r.order === k) : null);
+    const f = k => (oc(k) ? pct(oc(k).of_classified, oc2(k) ? oc2(k).of_classified : null) : '');
+    $('demand-order-note').textContent = `Of the classified works: order at most 2: ${f('<= 2')}; orders 3 and 4: ${f('3-4')}; order 5 or more: ${f('>= 5')}. The unclassified works name no catalogue equation and no family in the title.`;
+  }
+  requestAnimationFrame(() => markScrollable(sec));
 }
 
 // ---- the theorem map over the types (K, p): data/types.json, a slim copy of RUN/atlas/types.json ----------------

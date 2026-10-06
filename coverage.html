@@ -22,6 +22,7 @@
   <nav aria-label="Pages">
     <ul>
       <li><a href="index.html" data-nav="index">Solve</a></li>
+      <li><a href="examples.html" data-nav="examples">Examples</a></li>
       <li><a href="catalogue.html" data-nav="catalogue">Catalogue</a></li>
       <li><a href="coverage.html" data-nav="coverage">Coverage</a></li>
       <li><a href="check.html" data-nav="check">Check a solution</a></li>
@@ -48,6 +49,17 @@
   <ul class="legend" id="legend" aria-label="Levels"></ul>
   <div class="table-wrap"><table class="grid" id="grid" aria-labelledby="h-grid"></table></div>
   <div id="outside"></div>
+  <section id="demand" hidden>
+    <h2 id="h-demand">Which equations the literature treats</h2>
+    <p class="prose" id="demand-method"></p>
+    <details id="demand-method-full" hidden><summary>The counting in full</summary><p class="small prose"></p></details>
+    <div class="table-wrap"><table id="demand-classes" class="demand" aria-labelledby="h-demand"></table></div>
+    <div id="demand-rest"></div>
+    <h3 id="h-demand-order">By the order of the travelling-wave equation</h3>
+    <div class="table-wrap"><table id="demand-orders" class="demand" aria-labelledby="h-demand-order"></table></div>
+    <p class="small muted" id="demand-order-note"></p>
+  </section>
+
   <h2>The catalogue as a whole</h2>
   <div id="totals"></div>
   <h2>By field</h2>
@@ -92,7 +104,7 @@
   </section>
 </main>
 <footer class="site-footer">
-  <p>Data of 6 October 2026, 12:50 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Data of 6 October 2026, 13:42 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
   <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
 </footer>
 

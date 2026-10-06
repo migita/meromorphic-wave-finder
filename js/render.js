@@ -201,10 +201,21 @@ function normalFormBlock(nf, unknown) {
   d.append(body);
   return d;
 }
-function equationSection(rep) {
+/** one alternative reduction in words: "u = w(z), z = x - c*t; integrated once; order 2" */
+function reductionLabel(alt, isFirst) {
+  const n = Number(alt.integrated) || 0;
+  const bits = [has(alt.ansatz) ? text(alt.ansatz) : 'reduction ' + text(alt.index)];
+  bits.push(n === 0 ? 'not integrated' : (n === 1 ? 'integrated once' : `integrated ${n} times`));
+  if (has(alt.order)) bits.push('order ' + text(alt.order));
+  return bits.join('; ') + (isFirst ? ' (default)' : '');
+}
+function equationSection(rep, ctx = {}) {
   const eq = isObj(rep.equation) ? rep.equation : {};
   const input = isObj(rep.input) ? rep.input : {};
-  const sec = el('section', { class: 'r-eq', 'aria-labelledby': 'h-eq' }, el('h2', { id: 'h-eq' }, 'The equation as understood'));
+  const collapsed = ctx.equation === 'collapsed';
+  const sec = collapsed
+    ? el('details', { class: 'block r-eq', id: 'equation' }, el('summary', null, 'The equation as analysed'))
+    : el('section', { class: 'r-eq', 'aria-labelledby': 'h-eq' }, el('h2', { id: 'h-eq' }, 'The equation as understood'));
   const unknown = has(eq.unknown) ? text(eq.unknown) : 'w';
   const isPde = text(input.kind).toLowerCase() === 'pde' || isObj(input.reduction);
   if (has(input.text)) {
@@ -213,13 +224,36 @@ function equationSection(rep) {
   if (isObj(input.reduction)) {
     const r = input.reduction;
     const bits = [];
-    if (has(r.ansatz)) bits.push(el('span', null, 'travelling-wave reduction ', el('code', { class: 'sympy' }, text(r.ansatz))));
-    if (has(r.integrated) && Number(r.integrated) > 0) bits.push(`integrated ${Number(r.integrated) === 1 ? 'once' : text(r.integrated) + ' times'}`);
+    if (has(r.ansatz)) bits.push(el('span', null, 'the ansatz ', el('code', { class: 'sympy' }, text(r.ansatz))));
+    if (has(r.integrated)) bits.push(Number(r.integrated) > 0 ? `integrated ${Number(r.integrated) === 1 ? 'once' : text(r.integrated) + ' times'}` : 'not integrated');
     if (arr(r.constants).length) bits.push(el('span', null, plural(arr(r.constants).length, 'constant') + ' of integration ', symbolList(r.constants)));
+    const box = el('div', { class: 'reduction' });
     const p = el('p', null, 'Reduction applied: ', inlineList(bits, '; '), '.');
-    if (has(r.note)) p.append(' ', el('span', { class: 'muted' }, rich(r.note)));
+    if (has(r.note) && !/^(not integrated|integrated once)$/.test(text(r.note))) p.append(' ', el('span', { class: 'muted' }, rich(r.note)));
     if (has(r.steps)) p.append(' ', el('span', { class: 'muted' }, rich(r.steps)));
-    sec.append(p);
+    box.append(p);
+    const rf = facts([
+      ['constraints', arr(r.constraints).length ? inlineList(condList(r.constraints, r.constraints_latex)) : null],
+      ['conditions', arr(r.conditions).length ? inlineList(condList(r.conditions, r.conditions_latex)) : null],
+      ['sign convention', has(r.sign_convention) && text(r.sign_convention) !== text(r.ansatz) ? genericValue(r.sign_convention) : null],
+      ['chirp', has(r.chirp) ? genericValue(r.chirp) : null],
+    ]);
+    if (rf) box.append(rf);
+    // other reductions of the same input: the analysis is run again with the engine option reduction_index
+    const alts = arr(r.alternatives).filter(isObj);
+    if (alts.length > 1 && typeof ctx.onReduction === 'function') {
+      let current = Number.isInteger(ctx.reductionIndex) ? ctx.reductionIndex : alts.findIndex(x => text(x.ansatz) === text(r.ansatz) && Number(x.integrated) === Number(r.integrated));
+      if (current < 0) current = 0;
+      const sel = el('select', { id: 'reduction-select' });
+      alts.forEach((alt, i) => {
+        const idx = has(alt.index) ? Number(alt.index) : i;
+        sel.append(el('option', { value: String(idx), selected: idx === current }, reductionLabel(alt, idx === 0)));
+      });
+      sel.value = String(current);
+      sel.addEventListener('change', () => ctx.onReduction(Number(sel.value)));
+      box.append(el('p', { class: 'reduction-choice' }, el('label', { for: 'reduction-select' }, 'Reduction used: '), sel));
+    }
+    sec.append(box);
   }
   if (has(eq.latex) || has(eq.sympy)) sec.append(equationBox(eq));
   else sec.append(el('p', { class: 'muted' }, 'The report contains no equation.'));
@@ -440,7 +474,12 @@ function foundItem(sol, i, rep, C, opts = {}) {
   const unknown = has(eq.unknown) ? text(eq.unknown) : 'w';
   const v = has(eq.var) ? text(eq.var) : 'z';
   const key = has(s.id) ? text(s.id) : 'F' + (i + 1);
-  const art = el('article', { class: 'item item-found', id: C.idp + 'found-' + safeId(key) });
+  // two items of a report can carry the same identifier: the element ids stay unique
+  const used = C.used || (C.used = new Set());
+  let domId = C.idp + 'found-' + safeId(key);
+  if (used.has(domId)) { let k = 2; while (used.has(`${domId}-${k}`)) k++; domId = `${domId}-${k}`; }
+  used.add(domId);
+  const art = el('article', { class: 'item item-found', id: domId });
   const head = el('div', { class: 'item-head' }, el('span', { class: 'item-key' }, key));
   if (has(s.kind)) head.append(el('span', { class: 'item-kind' }, KIND_NAMES[text(s.kind)] || text(s.kind)));
   if (has(s.d)) head.append(el('span', { class: 'chip', title: 'transcendence degree of the field generated by the solution and its derivatives' }, tex(`d = ${text(s.d)}`)));
@@ -457,19 +496,45 @@ function foundItem(sol, i, rep, C, opts = {}) {
   let prefix = '';
   const hasLhs = latex && new RegExp('^\\s*' + unknown.replace(/[^A-Za-z]/g, '') + "\\s*('|\\^|_|\\(|\\\\left\\(|=)").test(latex) && /=/.test(latex);
   if (!hasLhs && !(latex && /^\s*[A-Za-z]\s*:/.test(latex))) prefix = `${unknown}(${v}) = `;
-  // a solution described in words (from an earlier record): the text, no copy buttons, no plot
-  if (has(latex) || hasExpr) art.append(formulaBox({ latex, sympy: hasExpr ? text(s.expr) : null, prefix, jets: false, tools: hasExpr }));
-  if (has(s.description)) art.append(el('p', { class: 'what' }, rich(s.description)));
+  const withLhs = tx => (new RegExp('^\\s*' + unknown.replace(/[^A-Za-z]/g, '') + "\\s*('|\\^|_|\\(|\\\\left\\(|=)").test(tx) && /=/.test(tx)) || /^\s*[A-Za-z]\s*:/.test(tx) ? '' : `${unknown}(${v}) = `;
   const consts = isObj(s.constants) ? Object.entries(s.constants) : [];
   const constsLatex = isObj(s.constants_latex) ? s.constants_latex : {};
+  const constRow = () => (consts.length ? (items => (consts.every(([, val]) => text(val).length <= 22) ? inlineList(items.map(x => el('span', { style: 'white-space:nowrap' }, x)), ', ') : ulist(items)))(
+    consts.map(([k, val]) => /^free\b/.test(text(val))
+      ? [mathOf(k, null, { jets: false }), ' ', text(val)]
+      : [mathOf(k, null, { jets: false }), ' = ', mathOf(text(val), constsLatex[k], { jets: false })])) : null);
+  const display = has(s.display_latex) ? text(s.display_latex) : null;
+  if (display) {
+    // a readable form is the main formula; the form the solver worked with, and its constants, are kept below it
+    art.append(formulaBox({ latex: display, sympy: hasExpr ? text(s.expr) : null, prefix: withLhs(display), jets: false }));
+    if (has(s.display_note)) art.append(el('p', { class: 'small muted' }, rich(s.display_note)));
+  } else if (has(latex) || hasExpr) {
+    // (a solution described in words, from an earlier record, has no copy buttons and no plot)
+    art.append(formulaBox({ latex, sympy: hasExpr ? text(s.expr) : null, prefix, jets: false, tools: hasExpr }));
+  }
+  const rf = isObj(s.real_form) && (has(s.real_form.latex) || has(s.real_form.expr)) ? s.real_form : null;
+  if (rf) {
+    const b = rf.bounded;
+    const how = b === true || /^(yes|true|bounded)$/i.test(text(b)) ? ', bounded' : (b === false || /^(no|false)$/i.test(text(b)) ? ', with poles on the real axis' : (has(b) ? ', ' + text(b) : ''));
+    const rtex = has(rf.latex) ? text(rf.latex) : null;
+    art.append(el('p', { class: 'real-form-h' }, 'Real on the real axis' + how),
+      formulaBox({ latex: rtex, sympy: has(rf.expr) ? text(rf.expr) : null, prefix: rtex ? withLhs(rtex) : `${unknown}(${v}) = `, jets: false }));
+    if (has(rf.note)) art.append(el('p', { class: 'small muted' }, rich(rf.note)));
+  }
+  if (has(s.description)) art.append(el('p', { class: 'what' }, rich(s.description)));
+  if (display && (has(latex) || hasExpr)) {
+    const d = el('details', { class: 'solver-form' }, el('summary', null, 'Form used by the solver'));
+    const body = el('div', { class: 'evidence-body' }, formulaBox({ latex, sympy: hasExpr ? text(s.expr) : null, prefix, jets: false }));
+    const cf = facts([['constants', constRow()]]);
+    if (cf) body.append(cf);
+    d.append(body);
+    art.append(d);
+  }
   const real = isObj(s.real) ? s.real : null;
   const f = facts([
     // inside a group of solutions with the same conditions the conditions are in the heading of the group
     ['holds when', arr(s.conditions).length && !opts.inGroup ? ulist(condList(s.conditions, s.conditions_latex)) : null],
-    ['constants', consts.length ? (items => (consts.every(([, val]) => text(val).length <= 22) ? inlineList(items.map(x => el('span', { style: 'white-space:nowrap' }, x)), ', ') : ulist(items)))(
-      consts.map(([k, val]) => /^free\b/.test(text(val))
-        ? [mathOf(k, null, { jets: false }), ' ', text(val)]
-        : [mathOf(k, null, { jets: false }), ' = ', mathOf(text(val), constsLatex[k], { jets: false })])) : null],
+    ['constants', display ? null : constRow()],
     ['free constants', arr(s.free).length ? inlineList(arr(s.free).map(n => /^[A-Za-z_]\w*$/.test(text(n)) ? mathOf(text(n), null, { jets: false }) : text(n))) : null],
     ['poles in a period', has(s.poles_per_period) ? text(s.poles_per_period) + (arr(s.pole_orders).length ? ` (order${arr(s.pole_orders).length > 1 ? 's' : ''} ${arr(s.pole_orders).map(text).join(', ')})` : '') : (arr(s.pole_orders).length ? 'orders ' + arr(s.pole_orders).map(text).join(', ') : null)],
     ['on the real axis', real ? [has(real.bounded_on_real_axis) ? 'bounded: ' + text(real.bounded_on_real_axis) : null, has(real.note) ? (has(real.bounded_on_real_axis) ? '; ' : '') + text(real.note) : null] : null],
@@ -487,19 +552,20 @@ function foundItem(sol, i, rep, C, opts = {}) {
       chk.python ? ', or run the engine in Python:' : '.') : null,
     chk && chk.python ? el('div', { class: 'snippet' }, el('pre', { class: 'raw' }, chk.python), copyButton('copy', chk.python, 'Copy the Python lines')) : null,
   ]));
-  // plot (lazy)
-  if (hasExpr && text(s.kind) !== 'constant') {
+  // plot (lazy); the real form is drawn when the report gives one
+  const plotSol = rf && has(rf.expr) ? Object.assign({}, s, { expr: text(rf.expr) }) : s;
+  if ((hasExpr || plotSol !== s) && text(s.kind) !== 'constant') {
     const d = el('details', { class: 'plot', hidden: true }, el('summary', null, 'Plot on the real axis'));
     const body = el('div', { class: 'plot-body' });
     d.append(body);
-    loadPlot().then(mod => { try { if (mod && (!mod.canPlot || mod.canPlot(s, rep))) d.hidden = false; } catch { /* stays hidden */ } });
+    loadPlot().then(mod => { try { if (mod && (!mod.canPlot || mod.canPlot(plotSol, rep))) d.hidden = false; } catch { /* stays hidden */ } });
     let done = false;
     d.addEventListener('toggle', async () => {
       if (!d.open || done) return;
       done = true;
       const mod = await loadPlot();
       if (!mod) { body.append(el('p', { class: 'small muted' }, 'The plotting module is not available in this build.')); return; }
-      try { mod.plotSolution(body, s, rep, { defaults: plotDefaults(s) }); }
+      try { mod.plotSolution(body, plotSol, rep, { defaults: plotDefaults(s) }); }
       catch (e) { body.append(el('p', { class: 'small muted' }, 'This formula cannot be drawn here (' + text(e && e.message) + ').')); }
     });
     art.append(d);
@@ -868,6 +934,7 @@ function dSection(rep, reg) {
   sec.append(el('p', { class: 'small muted dcap' }, 'Which ', tex('d'), ' occur — ', tex('d'), ' is the transcendence degree over ', tex('\\mathbb{C}'),
     ' of the field generated by a solution and its derivatives (', el('a', { href: 'method.html#d' }, 'definition'), ').'));
   const row = el('div', { class: 'dsum compact' });
+  const verdictBasis = isObj(rep.verdict) ? arr(rep.verdict.basis).flatMap(b => text(b).split(/\s*[,;]\s+/)).filter(has) : [];
   const names = { '0': ['d = 0', 'constants'], '1': ['d = 1', 'rational, simply periodic, elliptic'], '2': ['d = 2', ''], '3+': ['d \\geq 3', ''] };
   const keys = ['0', '1', '2', '3+'].concat(Object.keys(ds).filter(k => !['0', '1', '2', '3+'].includes(k)));
   for (const k of keys) {
@@ -883,7 +950,12 @@ function dSection(rep, reg) {
     else {
       cell.append(el('span', { class: 'ds' }, has(o.status) ? text(o.status) : 'no information',
         has(o.count) && Number(o.count) > 0 ? ` (${text(o.count)} listed)` : ''));
-      if (has(o.basis)) cell.append(el('span', { class: 'db' }, 'basis: ', inlineList(arr(o.basis).flatMap(b => text(b).split(/\s*[,;]\s+/)).filter(has).map(b => basisChip(b, reg.ids)), ' ')));
+      if (has(o.basis)) {
+        // the same basis as the verdict is not repeated in every cell
+        const items = arr(o.basis).flatMap(b => text(b).split(/\s*[,;]\s+/)).filter(has);
+        const same = items.length > 2 && items.join('|') === verdictBasis.join('|');
+        cell.append(el('span', { class: 'db' }, 'basis: ', same ? 'as for the verdict' : inlineList(items.map(b => basisChip(b, reg.ids)), ' ')));
+      }
       if (has(o.note)) cell.append(el('span', { class: 'db' }, rich(o.note)));
     }
     row.append(cell);
@@ -1153,7 +1225,10 @@ function tailSection(rep) {
 /**
  * renderReport(report, container, ctx)
  * ctx: { registry: array of registry entries (optional), source: text shown above the result,
- *        permalink: URL string (optional), filename: for the download (optional) }
+ *        permalink: URL string (optional), filename: for the download (optional),
+ *        equation: 'collapsed' (the equation section as a collapsed block after the lists; for pages that show
+ *                  the equation themselves),
+ *        onReduction: function(index) called when the visitor chooses another reduction; reductionIndex: the one in use }
  */
 export function renderReport(report, container, ctx = {}) {
   container.textContent = '';
@@ -1188,13 +1263,14 @@ export function renderReport(report, container, ctx = {}) {
       warnings.length === 1 ? rich(warnings[0]) : null), warnings.length > 1 ? ulist(warnings.map(w => rich(w))) : null));
   }
   const parts = [
-    () => equationSection(report),
+    () => (ctx.equation === 'collapsed' ? null : equationSection(report, ctx)),
     () => verdictSection(report, reg, { idp: '' }),
     () => dSection(report, reg),
     () => listsSection(report, C),
     () => strataSection(report, C),
     () => substitutionsSection(report, C),
     () => surfacesSection(report, C),
+    () => (ctx.equation === 'collapsed' ? equationSection(report, ctx) : null),
     () => localSection(report, C),
     () => rejectedSection(report, C),
     () => twistsSection(report, C),

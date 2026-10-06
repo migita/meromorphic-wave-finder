@@ -1,5 +1,5 @@
 // The catalogue: a searchable, filterable, sortable table of the corpus; a row opens the precomputed report.
-import { initPage, el, fetchJSONor, text, has, isObj, arr, safeId, meter, levelName, LEVEL_ORDER, LEVELS,
+import { initPage, el, append, fetchJSONor, text, has, isObj, arr, safeId, meter, levelName, LEVEL_ORDER, LEVELS,
   formulaBox, mathOf, symbolList, rich, sympyToLatex } from './common.js';
 import { renderReport } from './render.js';
 
@@ -124,13 +124,22 @@ function refList(items, withMethod) {
   return ol;
 }
 
+/** a collapsed list of references with the number of entries in the summary line */
+function refBlock(title, items, withMethod, id) {
+  const list = arr(items);
+  if (!list.length) return null;
+  return el('details', { class: 'block refs', id }, el('summary', null, title, el('span', { class: 'n' }, String(list.length))), refList(list, withMethod));
+}
+
+// The page of one entry. Order: title line, the evolution equation, the reduction (ansatz and reduced equation in
+// one block), the report (verdict first), then the two bibliographies, collapsed.
 async function showEntry(id) {
   $('list-view').hidden = true;
   $('entry-view').hidden = false;
   document.body.dataset.view = 'entry';
   const e = catalogue.find(x => text(x.id) === id);
-  const head = $('entry-head');
-  head.textContent = '';
+  const head = $('entry-head'), refs = $('entry-refs');
+  head.textContent = ''; refs.textContent = '';
   if (!e) {
     head.append(el('h1', null, 'No such entry'), el('p', null, `The catalogue has no equation with the identifier “${id}”.`));
     document.documentElement.dataset.ready = '1';
@@ -153,36 +162,40 @@ async function showEntry(id) {
   const red = isObj(e.reduction) ? e.reduction : null;
   if (red || has(e.ode) || has(e.ode_latex)) {
     head.append(el('h2', null, red ? 'The reduction' : (arr(e.system).length ? 'The scalar equation' : 'The equation')));
+    const block = el('div', { class: 'reduction-block' });
     if (red) {
       const p = el('p', null);
-      if (has(red.ansatz)) p.append('Ansatz ', el('code', { class: 'sympy' }, text(red.ansatz)), '. ');
-      if (has(red.steps)) p.append(rich(red.steps), '. ');
-      if (arr(red.constraints).length) p.append('Constraints: ', el('code', { class: 'sympy' }, arr(red.constraints).map(text).join('; ')), '.');
-      head.append(p);
+      // the steps often begin by repeating the ansatz: it is printed once
+      let steps = has(red.steps) ? text(red.steps).replace(/\.\s*$/, '') : '';
+      if (has(red.ansatz) && steps.startsWith(text(red.ansatz))) steps = steps.slice(text(red.ansatz).length).replace(/^[;,.\s]+/, '');
+      if (has(red.ansatz)) append(p, ['Ansatz ', el('code', { class: 'sympy' }, text(red.ansatz)), steps ? '; ' : '. ']);
+      if (steps) append(p, [rich(steps), '. ']);
+      if (arr(red.constraints).length) append(p, ['Constraints: ', el('code', { class: 'sympy' }, arr(red.constraints).map(text).join('; ')), '.']);
+      if (p.childNodes.length) block.append(p);
     }
     const ode = has(e.ode) ? text(e.ode) : (red && has(red.ode) ? text(red.ode) : null);
     let olx = has(e.ode_latex) ? text(e.ode_latex) : null;
     if (olx && !/=/.test(olx)) olx += ' = 0';
-    if (ode || olx) head.append(formulaBox({ latex: olx, sympy: ode, hint: ode ? 'SymPy text: E, with the jets w0 = w, w1 = w′, …; the equation is E = 0' : '' }));
-    const rows = el('dl', { class: 'facts' });
-    const add = (k, v) => { if (v) rows.append(el('dt', null, k), el('dd', null, v)); };
-    add('order', has(e.order) ? text(e.order) : null);
-    add('degree', has(e.degree) ? text(e.degree) : null);
-    add('parameters', arr(e.params).length ? symbolList(e.params) : null);
-    add('conditions on the parameters', has(e.param_notes) ? rich(e.param_notes) : null);
-    add('polynomial', e.polynomial === false ? 'no' + (has(e.substitution) ? '; polynomial after the substitution ' + text(e.substitution) : '') : null);
-    add('autonomous', e.autonomous === false ? 'no' : null);
+    if (ode || olx) block.append(formulaBox({ latex: olx, sympy: ode, hint: ode ? 'SymPy text: E, with the jets w0 = w, w1 = w′, …; the equation is E = 0' : '' }));
+    const bits = [];
+    if (has(e.order)) bits.push('order ' + text(e.order));
+    if (has(e.degree)) bits.push('degree ' + text(e.degree));
+    const line = el('p', { class: 'small eq-line' }, bits.join(', '));
+    if (arr(e.params).length) append(line, [bits.length ? '; parameters ' : 'parameters ', symbolList(e.params)]);
+    if (has(e.param_notes)) append(line, [' (', rich(e.param_notes), ')']);
+    if (e.polynomial === false) append(line, ['; not polynomial' + (has(e.substitution) ? ', polynomial after the substitution ' + text(e.substitution) : '')]);
+    if (e.autonomous === false) append(line, ['; not autonomous']);
     if (isObj(e.type)) {
       const ty = e.type;
-      add('type', text(ty.status) === 'type' && has(ty.K) && has(ty.p)
-        ? [`order ${text(ty.K)}, pole order ${text(ty.p)}`, has(ty.kind) ? `, ${text(ty.kind).replace('-', ' ')}` : '', has(ty.subtype) ? [' (', el('a', { href: 'coverage.html#' + encodeURIComponent(text(ty.subtype)) }, 'what the theorems say for this type'), ')'] : null]
-        : (has(ty.status) ? `no type (K, p): ${text(ty.status)}` : null));
+      if (text(ty.status) === 'type' && has(ty.K) && has(ty.p)) {
+        append(line, [`; type: order ${text(ty.K)}, pole order ${text(ty.p)}`, has(ty.kind) ? `, ${text(ty.kind).replace('-', ' ')}` : '',
+          has(ty.subtype) ? [' (', el('a', { href: 'coverage.html#' + encodeURIComponent(text(ty.subtype)) }, 'what the theorems say for this type'), ')'] : '']);
+      } else if (has(ty.status)) append(line, [`; no type (K, p): ${text(ty.status)}`]);
     }
-    if (rows.children.length) head.append(rows);
+    if (line.childNodes.length) block.append(line);
+    head.append(block);
   }
   if (has(e.notes)) head.append(el('p', { class: 'small muted' }, rich(e.notes)));
-  if (arr(e.sources).length) head.append(el('h2', null, 'Where the equation occurs'), refList(e.sources, false));
-  if (arr(e.ansatz_papers).length) head.append(el('h2', null, 'Papers with exact solutions by an ansatz'), refList(e.ansatz_papers, true));
 
   const res = $('result'), msg = $('message');
   res.textContent = ''; msg.textContent = '';
@@ -191,10 +204,10 @@ async function showEntry(id) {
   if (e.has_report) {
     const rep = await fetchJSONor(`data/reports/${safeId(e.id)}.json`, null);
     if (isObj(rep)) {
-      head.append(el('h2', null, 'Report'));
-      renderReport(rep, res, { registry, source: 'Precomputed report of the catalogue', permalink: new URL(entryUrl(e.id), document.baseURI).href, filename: 'report-' + safeId(e.id) });
+      head.append(el('h2', { id: 'report' }, 'The answer'));
+      // the reduced equation is shown just above: in the report it is a collapsed block after the lists
+      renderReport(rep, res, { registry, source: 'Precomputed report of the catalogue', permalink: new URL(entryUrl(e.id), document.baseURI).href, filename: 'report-' + safeId(e.id), equation: 'collapsed' });
       window.__lastReport = rep;
-      if (liveLink) msg.append(el('p', { class: 'small' }, liveLink, '.'));
     } else {
       msg.append(el('div', { class: 'notice' }, el('p', null, 'The report of this entry could not be loaded. ', liveLink)));
     }
@@ -203,6 +216,12 @@ async function showEntry(id) {
       running: 'The report of this entry is being computed.', error: 'The engine failed on this entry; there is no report.' }[text(e.batch_status)] || 'There is no precomputed report for this entry yet.';
     msg.append(el('div', { class: 'notice plain' }, el('p', null, why + ' ', liveLink ? [liveLink, '.'] : null)));
   }
+  // the bibliographies come after the answer, collapsed
+  const r1 = refBlock('Where the equation occurs', e.sources, false, 'refs-sources');
+  const r2 = refBlock('Papers with exact solutions by an ansatz', e.ansatz_papers, true, 'refs-ansatz');
+  if (r1) refs.append(r1);
+  if (r2) refs.append(r2);
+  if (e.has_report && liveLink) refs.append(el('p', { class: 'small' }, liveLink, '.'));
   document.documentElement.dataset.ready = '1';
 }
 
