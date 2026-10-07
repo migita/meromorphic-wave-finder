@@ -949,7 +949,7 @@ function listsSection(rep, C) {
   if (loci.length) {
     // one grey line: where the equation loses order or degree it is another equation, whose solutions are not listed
     foundSec.append(el('p', { class: 'small muted degenerate', title: isObj(dl) && has(dl.note) ? text(dl.note) : '' },
-      'Not listed: parameter loci on which the equation loses order or degree (', inlineList(loci.map(l => inlineList(text(l).split(/\s*,\s+/).map(c => condNode(c)), ', ')), '; '), ').'));
+      'Not analysed here: parameter loci on which the equation loses order or degree (', inlineList(loci.map(l => inlineList(text(l).split(/\s*,\s+/).map(c => condNode(c)), ', ')), '; '), ').'));
   }
   // solutions that an earlier record only describes: a short block under the list, not counted
   const described = isObj(rep.atlas) ? arr(rep.atlas.described) : [];
