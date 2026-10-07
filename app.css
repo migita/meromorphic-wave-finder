@@ -513,3 +513,54 @@ noscript p { max-width: var(--wide); margin: 1rem auto; padding: 0 1.25rem; font
   .preview, .site-header nav, .ask, .result-tools, .formula-tools, .status, .site-footer { display: none; }
   details > *:not(summary) { display: block; }
 }
+
+/* ---- round 5: how a verdict was decided, special families, candidates, the page of checks ---- */
+details.how-decided { margin: .35rem 0 0; }
+details.how-decided > summary { font-family: var(--sans); font-size: .86rem; color: var(--accent); cursor: pointer; width: fit-content; }
+details.how-decided > p { margin: .35rem 0 .2rem 1rem; max-width: 60rem; }
+details.how-decided .how-detail, details.how-decided .how-method { font-family: var(--sans); color: var(--muted); }
+.verdict-level a.scope-generic { text-decoration: none; color: var(--accent); }
+.verdict-level a.scope-generic:hover { text-decoration: underline; }
+.verdict-level .scope + .scope { margin-left: .4rem; }
+.chip-special { border-style: dashed; border-color: var(--accent); color: var(--fg); white-space: nowrap; }
+.chip-search { border-style: dotted; border-color: var(--muted); color: var(--muted); white-space: nowrap; }
+.view-toggle { font-family: var(--sans); font-size: .86rem; margin: .2rem 0 .6rem; display: flex; flex-wrap: wrap; gap: .3rem .4rem; align-items: center; }
+.view-toggle .k { color: var(--muted); }
+.view-btn { font: inherit; padding: .15rem .6rem; border: 1px solid var(--rule); border-radius: 3px; background: var(--bg); color: var(--fg); cursor: pointer; }
+.view-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+details.special-families { border-top: 2px solid var(--rule); margin-top: .4rem; }
+details.special-families > details.stratum { margin-left: .8rem; }
+details.special-families > p, details.special-families > .table-wrap { margin-left: .8rem; }
+details.special-families .stratum .chip-special { display: none; }
+.where-roots, .display-note { max-width: 60rem; }
+.candidates-pointer { margin-top: .6rem; }
+table.symbols td { padding-right: 1.2rem; }
+.nf-rule .math-scroll { max-width: 100%; }
+.check-note { border-top: 1px solid var(--rule); padding: .7rem 0 .2rem; max-width: 46rem; }
+.check-note h3 { margin: 0 0 .3rem; font-size: 1.08rem; }
+.check-note p { margin: 0 0 .45rem; }
+.check-outcome { font-family: var(--sans); font-size: .92rem; border-left: 3px solid var(--rule); padding-left: .7rem; }
+.check-outcome .k { font-weight: 600; }
+#checks-levels { min-width: 22rem; }
+#checks-levels .sw { display: inline-flex; width: 1.3rem; height: .65rem; margin: 0 .5rem 0 0; vertical-align: middle; }
+#checks-levels tr.total td { border-top: 1px solid var(--fg); font-weight: 600; }
+#checks-limits li { margin-bottom: .4rem; max-width: 46rem; }
+
+/* ---- round 6: notes of the engine under the input box, the reduction scope, exponent instances ---- */
+.input-warnings { font-family: var(--sans); font-size: .86rem; margin: .4rem 0 0; padding: .3rem .6rem; border-left: 3px solid var(--accent); background: var(--panel); color: var(--fg); }
+.input-warnings[hidden] { display: none; }
+.input-warnings p { margin: .1rem 0; max-width: 60rem; }
+.input-warnings .iw-head { font-weight: 600; }
+.verdict-text.reduction-scope { margin-top: -.15rem; }
+.verdict-level .scope.about .katex { font-size: 1em; }
+.entry-scope { font-size: .98rem; max-width: 46rem; margin: .1rem 0 .6rem; padding: .35rem .7rem; border-left: 3px solid var(--accent); background: var(--panel); }
+.red-line .ansatz-note { font-family: var(--sans); font-size: .86rem; color: var(--muted); }
+tr.locus-degenerate td { color: var(--muted); }
+.label-note em { font-style: normal; font-weight: 600; }
+
+/* a long inline formula (a condition on the parameters inside a sentence) scrolls inside its own box */
+.tex-long { display: inline-block; max-width: 100%; overflow-x: auto; overflow-y: hidden; vertical-align: middle; }
+
+/* ---- round 7: a step of the browser engine that did not end; the analysis is repeated without it ---- */
+.status-text .status-note { font-size: .9rem; margin-top: .25rem; padding: .25rem .6rem; border-left: 3px solid var(--mark); background: var(--bg); max-width: 60rem; }
+.status-text .status-note[hidden] { display: none; }

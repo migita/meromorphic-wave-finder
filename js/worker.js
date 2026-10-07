@@ -62,7 +62,9 @@ def _mero_json(out):
     return out if isinstance(out, str) else json.dumps(out, default=str)
 
 def _mero_progress(msg):
-    print("step: %s" % (msg,))
+    # one line "step: <label>" for each step (the engine may or may not put the prefix itself)
+    msg = str(msg)
+    print(msg if msg.startswith("step: ") else "step: %s" % (msg,))
 
 def _mero_instrument(R):
     """Live progress: if the report module has no progress hook of its own, announce each step it times."""

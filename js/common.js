@@ -124,8 +124,11 @@ export function rich(s) {
   let last = 0, m;
   while ((m = re.exec(src)) !== null) {
     if (m.index > last) frag.append(src.slice(last, m.index));
-    if (m[1] !== undefined) frag.append(tex(m[1]));
-    else frag.append(el('code', { text: m[2] }));
+    if (m[1] !== undefined) {
+      // a long inline formula does not wrap: it scrolls inside its own box instead of widening the page
+      if (m[1].length > 48) frag.append(el('span', { class: 'tex-long' }, tex(m[1])));
+      else frag.append(tex(m[1]));
+    } else frag.append(el('code', { text: m[2] }));
     last = m.index + m[0].length;
   }
   if (last < src.length) frag.append(src.slice(last));
@@ -190,7 +193,7 @@ export function badge(label, opts = {}) {
     'aria-describedby': id, 'aria-expanded': 'false',
   }, name);
   const tip = el('span', { class: 'tip', role: 'tooltip', id },
-    known ? LABELS[name] : (opts.tip || 'Not one of the five labels of the site; see the method page.'));
+    known ? LABELS[name] : (opts.tip || 'Not one of the labels of the site; see the method page.'));
   wrap.append(b, tip);
   return wrap;
 }

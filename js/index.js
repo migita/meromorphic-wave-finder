@@ -1,5 +1,5 @@
 // The entry page: one input box, the result below.
-import { initPage, el, fetchJSONor, norm, text, has, isObj, arr, safeId } from './common.js';
+import { initPage, el, fetchJSONor, norm, text, has, isObj, arr, safeId, rich } from './common.js';
 import { renderReport } from './render.js';
 import * as engine from './engine.js';
 
@@ -29,6 +29,7 @@ function showStatus(now) {
   $('status').hidden = false;
   $('status-now').textContent = now;
   $('status-log').textContent = '';
+  $('status-note').textContent = ''; $('status-note').hidden = true;
   const t0 = performance.now();
   clearInterval(timer);
   const tick = () => { $('status-elapsed').textContent = `${Math.round((performance.now() - t0) / 1000)} s`; };
@@ -37,6 +38,14 @@ function showStatus(now) {
 function hideStatus() { clearInterval(timer); $('status').hidden = true; }
 const hooks = {
   onStatus: m => { $('status-now').textContent = text(m.text); },
+  // a step of the engine in the browser did not end: the worker was stopped and the analysis starts again without it
+  // (the sentence stays under the status line until the run ends)
+  onRestart: m => {
+    const n = $('status-note');
+    n.textContent = text(m.text); n.hidden = false;
+    $('status-now').textContent = 'Starting the engine again…';
+    window.__engineRestarts = (window.__engineRestarts || []).concat([{ step: m.step, steps: m.steps, repetition: m.repetition }]);
+  },
   onLog: line => {
     const m = /^step:\s*(.+)$/.exec(text(line));
     if (m) $('status-now').textContent = `Analysing the equation: ${m[1]}…`;
@@ -62,6 +71,18 @@ function inputError(msg) {
   n.textContent = msg || '';
   n.hidden = !msg;
 }
+/** the warnings of a report (how the input was read: a renamed parameter, a product read in a certain way, a step
+    stopped at its time limit) directly under the input box, where they stay in view; they are also in the result */
+function inputWarnings(list) {
+  const n = $('input-warnings');
+  const ws = arr(list).filter(has).map(text);
+  n.textContent = '';
+  n.hidden = !ws.length;
+  if (!ws.length) return;
+  n.append(el('p', { class: 'iw-head' }, ws.length === 1 ? 'Note of the engine on this input:' : 'Notes of the engine on this input:'));
+  for (const w of ws.slice(0, 3)) n.append(el('p', null, rich(w)));
+  if (ws.length > 3) n.append(el('p', { class: 'muted' }, `and ${ws.length - 3} more, at the top of the result`));
+}
 
 function show(report, ctx) {
   const eqText = isObj(report.input) && has(report.input.text) ? text(report.input.text) : ctx.eq;
@@ -71,6 +92,7 @@ function show(report, ctx) {
     $('result').textContent = '';
     document.body.classList.remove('has-result');
     inputError(has(v.text) ? text(v.text) : 'The input could not be read.');
+    inputWarnings(report.warnings);
     window.__lastReport = report;
     document.dispatchEvent(new CustomEvent('report-rendered', { detail: { source: ctx.source, unsupported: true } }));
     return;
@@ -85,6 +107,7 @@ function show(report, ctx) {
     reductionIndex: red !== null ? red : undefined,
   });
   document.body.classList.add('has-result');
+  inputWarnings(report.warnings);
   // the answer first: the verdict box at the top of the window (below the input row)
   requestAnimationFrame(() => { const vb = document.querySelector('#result > .verdict'); if (vb) vb.scrollIntoView({ block: 'start' }); });
   const shown = has(eqText) ? text(eqText) : '';
@@ -119,6 +142,7 @@ async function run(eqText, { forceLive = false, push = true, again = false, redu
   $('result').textContent = '';
   message(null);
   inputError(null);
+  inputWarnings(null);
   const server = await engine.detectServer();
   if (my !== runNo) return;
   if (!server && !forceLive) {
@@ -130,6 +154,9 @@ async function run(eqText, { forceLive = false, push = true, again = false, redu
   const options = { budget_s: budget };
   if (!$('atlas').checked) options.atlas = false;
   if (red !== null) options.reduction_index = red;
+  // for tests: ?watchdog=<seconds> replaces the limit after which the page stops an analysis that does not end
+  const wd = Number(new URLSearchParams(location.search).get('watchdog'));
+  if (wd > 0) options.watchdog_s = wd;
   const key = cacheKey(eqText, options);
   const kept = !server && !again ? cacheGet(key) : null;
   if (kept && isObj(kept.report) && Number(kept.budget) >= budget) {
@@ -141,16 +168,26 @@ async function run(eqText, { forceLive = false, push = true, again = false, redu
   }
   showStatus(server ? 'Sending the equation to the server…' : 'Starting the engine in your browser…');
   $('go').disabled = true;
+  window.__engineRestarts = [];
   try {
-    const { report, backend, info } = await engine.analyze(eqText, options, hooks);
+    const { report, backend, info, repetitions } = await engine.analyze(eqText, options, hooks);
     if (my !== runNo) return;
     if (backend === 'browser' && isObj(report)) cachePut(key, { report, budget });
-    show(report, { source: backend === 'server' ? (report && report.cached ? 'Computed by the server (answer from its cache)' : 'Computed by the server') : 'Computed in your browser', eq: eqText, reduction: red });
+    show(report, { source: backend === 'server' ? (report && report.cached ? 'Computed by the server (answer from its cache)' : 'Computed by the server')
+      : 'Computed in your browser' + (repetitions ? ` (repeated ${repetitions === 1 ? 'once' : repetitions + ' times'} without the steps that did not end)` : ''), eq: eqText, reduction: red });
     if (backend === 'browser' && info) noteBackend(`engine in the browser (Pyodide ${text(info.pyodide)}, Python ${text(info.python)}, SymPy ${text(info.sympy)})`);
   } catch (e) {
     if (my !== runNo) return;
     if (e && e.cancelled) message(notice(el('p', null, cancelText(server)), 'plain'));
     else if (e && e.unavailable) message(notice(el('p', null, 'The engine is not yet available in this build: the archive ', el('code', null, 'engine/mero.zip'), ' has no module ', el('code', null, 'mero.report'), '. Reports of the catalogue can be read meanwhile.')));
+    else if (e && e.unfinished) {
+      // the watchdog of the page gave up: a readable end, with what did not end and where to look instead
+      const entry = matchCatalogue(eqText);
+      message(notice([el('p', null, el('strong', null, 'The engine in your browser did not finish this equation. '), text(e.message), ' Nothing is claimed about this equation.'),
+        el('p', null, entry ? ['The catalogue has an answer computed in advance for this equation: ', el('a', { href: 'catalogue.html?id=' + encodeURIComponent(text(entry.id)) }, text(entry.name || entry.id)), '. ']
+          : ['If the equation is in the ', el('a', { href: 'catalogue.html' }, 'catalogue'), ', its page has an answer computed in advance. '],
+          'The full version of the engine, which runs on a computer and not in the browser, has longer limits and stops a single computation that does not end (see ', el('a', { href: 'method.html#versions' }, 'Two versions'), ').')]));
+    }
     else {
       console.warn('engine error', e);
       message(notice([el('p', null, el('strong', null, 'The engine stopped with an error. '), 'Nothing is claimed about this equation. The message of the engine follows.'),

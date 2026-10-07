@@ -19,7 +19,7 @@ const DETAIL_NAMES = {
 const KNOWN_TOP = new Set(['schema', 'engine', 'mode', 'elapsed_s', 'input', 'equation', 'normal_form', 'local',
   'classes', 'theorems', 'verdict', 'found', 'ruled_out', 'not_decided', 'd_summary', 'atlas', 'warnings', 'log',
   'sample_note', 'note', 'cached', 'rejected', 'strata', 'substitutions', 'twists', 'surfaces', 'degenerate_loci',
-  'independent_check', 'candidates'].concat(DETAIL_KEYS));
+  'independent_check', 'candidates', 'copies_removed'].concat(DETAIL_KEYS));
 
 const KIND_NAMES = {
   'constant': 'constant', 'polynomial': 'polynomial', 'rational': 'rational function',
@@ -95,6 +95,44 @@ function inlineList(nodes, sep = ', ') {
   const out = [];
   nodes.forEach((n, i) => { if (i) out.push(sep); out.push(n); });
   return out;
+}
+/** the conditions of a found family: those on the parameters of the equation, and those that name the level C_I of a
+    first integral (C_I is a constant of integration, not a parameter) */
+const mentionsCI = c => /(^|[^A-Za-z0-9_])C_I(?![A-Za-z0-9_])/.test(text(c));
+function splitConditions(s) {
+  const conds = arr(s && s.conditions), lat = arr(s && s.conditions_latex);
+  const out = { par: [], parL: [], level: [], levelL: [] };
+  conds.forEach((c, i) => { const ci = mentionsCI(c); (ci ? out.level : out.par).push(c); (ci ? out.levelL : out.parL).push(lat[i]); });
+  return out;
+}
+/** a family lives on special parameter values when one of its conditions on the parameters is an equality */
+const isSpecialFamily = s => isObj(s) && splitConditions(s).par.some(c => /==/.test(text(c)));
+const isDirectSearch = s => isObj(s) && has(s.note) && /found by a direct search on/.test(text(s.note));
+/** "any root of P = 0 (remark)" with P typeset; null if the text is not of this form */
+function rootNodes(val) {
+  const m = /^any root of\s+(.+?)\s*=\s*0\b\s*(.*)$/.exec(text(val).trim());
+  if (!m) return null;
+  const lx = sympyToLatex(m[1], { jets: false });
+  if (lx === null) return null;
+  return ['any root of ', el('span', { class: 'math-scroll' }, tex(lx + ' = 0')), m[2] ? ' ' + m[2] : ''];
+}
+/** a note of the engine made of clauses separated by "; ": a clause "r is any root of P = 0" is typeset */
+function clauseNodes(note) {
+  const t = text(note);
+  const parts = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+    else if (ch === ';' && depth === 0 && t[i + 1] === ' ') { parts.push(t.slice(start, i)); start = i + 2; }
+  }
+  parts.push(t.slice(start));
+  return inlineList(parts.map(p => {
+    const m = /^\s*([A-Za-z_]\w*) is (any root of .*)$/.exec(p);
+    const r = m ? rootNodes(m[2]) : null;
+    return r ? [mathOf(m[1], null, { jets: false }), ' is ', r] : rich(p);
+  }), '; ');
 }
 function genericValue(v) {
   if (!has(v)) return null;
@@ -245,7 +283,13 @@ function equationSection(rep, ctx = {}) {
     if (has(r.note) && !/^(not integrated|integrated once)$/.test(text(r.note))) p.append(' ', el('span', { class: 'muted' }, rich(r.note)));
     if (has(r.steps)) p.append(' ', el('span', { class: 'muted' }, rich(r.steps)));
     box.append(p);
+    // constants that the reduction set to a value (the answer then covers only the travelling waves with that value),
+    // and what the reader of the input changed (a renamed parameter, ...)
+    const assumed = arr(r.assumed).filter(a => isObj(a) && has(a.constant));
+    const redWarnings = arr(r.warnings).filter(has);
     const rf = facts([
+      ['set in this reduction', assumed.length ? ulist(assumed.map(a => [condNode(`${text(a.constant)} == ${has(a.value) ? text(a.value) : '0'}`), has(a.why) ? [' — ', el('span', { class: 'small' }, rich(a.why))] : null]), 'assumed') : null],
+      ['read differently', redWarnings.length ? ulist(redWarnings.map(w => rich(w)), 'red-warnings') : null],
       ['constraints', arr(r.constraints).length ? inlineList(condList(r.constraints, r.constraints_latex)) : null],
       ['conditions', arr(r.conditions).length ? inlineList(condList(r.conditions, r.conditions_latex)) : null],
       ['sign convention', has(r.sign_convention) && text(r.sign_convention) !== text(r.ansatz) ? genericValue(r.sign_convention) : null],
@@ -306,11 +350,24 @@ function verdictSection(rep, reg, opts = {}) {
   // the label of the verdict: the weakest label among the statements it needs
   if (isLabel(v.label)) line.append(' ', badge(v.label));
   if (level === 'complete-generic') {
-    if (has(v.special_min)) line.append(el('span', { class: 'scope scope-generic' }, 'special loci: ' + (LEVELS[text(v.special_min)] ? levelWords(v.special_min).toLowerCase() : text(v.special_min))));
+    // what is known on the special parameter values: all analysed, or how many sets of them are in the list "not decided"
+    const openLoci = arr(rep.not_decided).filter(it => isObj(it) && text(it.kind) === 'parameter-locus').length;
+    const sm = has(v.special_min) ? text(v.special_min) : '';
+    if (sm === 'complete') line.append(el('span', { class: 'scope scope-generic special-note' }, 'special values analysed'));
+    else if (sm && sm !== 'not analysed') line.append(el('span', { class: 'scope scope-generic special-note' }, 'special loci: ' + (LEVELS[sm] ? levelWords(sm).toLowerCase() : sm)));
+    if (sm !== 'complete' && openLoci > 0) {
+      line.append(el('a', { class: 'scope scope-generic special-open to-part', href: `#${opts.idp || ''}list-open`,
+        title: 'The special parameter values that were not analysed are items of the list “Not decided”' },
+        `${openLoci} ${openLoci === 1 ? 'set' : 'sets'} of special parameter values not analysed`));
+    } else if (sm === 'not analysed') line.append(el('span', { class: 'scope scope-generic special-note' }, 'special values not analysed'));
   } else if (scope) line.append(el('span', { class: 'scope' + (generic ? ' scope-generic' : '') }, generic ? 'for generic values of the parameters only' : scope));
+  // what the verdict is about, when the equation analysed is a reduction of the equation entered: the sentence
+  // `reduction_scope` under the text, or else the short phrase `about` next to the level
+  if (has(v.about) && !has(v.reduction_scope)) line.append(el('span', { class: 'scope about' }, 'about ', rich(v.about)));
   sec.append(line);
   if (has(v.text)) sec.append(el('p', { class: 'verdict-text' }, rich(v.text)));
   else if (info) sec.append(el('p', { class: 'verdict-text' }, info.long.charAt(0).toUpperCase() + info.long.slice(1) + '.'));
+  if (has(v.reduction_scope)) sec.append(el('p', { class: 'verdict-text reduction-scope' }, rich(v.reduction_scope)));
   if (isObj(v.record) && (has(v.record.text) || has(v.record.id))) {
     // an earlier record of the project that states a complete list: it is reported, it does not raise the level
     sec.append(el('p', { class: 'verdict-note record-line' },
@@ -330,7 +387,8 @@ function verdictSection(rep, reg, opts = {}) {
     const j = strata.findIndex(s => arr(s.conditions).map(text).join(' & ') === key);
     rows.append(el('li', null, meter(l.level), el('span', null,
       el('strong', null, arr(l.conditions).length ? ['When ', inlineList(condList(l.conditions, l.conditions_latex))] : 'On a special locus', ': ', levelWords(l.level).toLowerCase()), '. ',
-      has(l.text) ? rich(l.text) : null,
+      // (the case of a particular exponent is shown in full below, open: its sentence is not repeated here)
+      has(l.text) && !(j >= 0 && strata[j].exponent_instance === true) ? rich(l.text) : null,
       j >= 0 ? [' ', el('a', { href: `#${opts.idp || ''}stratum-${j + 1}`, class: 'to-part' }, 'The lists for this case')] : null)));
   });
   const as = v.after_substitution;
@@ -345,6 +403,7 @@ function verdictSection(rep, reg, opts = {}) {
   if (has(v.level_before_check)) extra.push(el('span', null, 'Before the independent check of the found list the level was: ', levelWords(v.level_before_check).toLowerCase()));
   if (extra.length) sec.append(el('p', { class: 'verdict-note' }, inlineList(extra, '; ')));
   const basis = arr(v.basis);
+  let basisLine = null;
   if (basis.length) {
     // every statement the verdict rests on carries its own label; those that decide the label of the verdict are marked
     const labels = isObj(v.labels) ? v.labels : {};
@@ -358,8 +417,19 @@ function verdictSection(rep, reg, opts = {}) {
       return el('span', { class: 'based' + (decisive.has(id) ? ' decisive' : ''), title: LABELS[lab] + (decisive.has(id) ? ' The label of the verdict comes from this statement.' : '') },
         chip, el('span', { class: 'minibadge badge-' + lab }, lab));
     });
-    sec.append(el('p', { class: 'verdict-basis' }, 'Rests on: ', items));
+    basisLine = el('p', { class: 'verdict-basis' }, 'Rests on: ', items);
   }
+  // the technical sentence of the module that decided (when the verdict text is one of the standard sentences): collapsed,
+  // together with the statements the verdict rests on
+  const detail = has(v.detail) && text(v.detail).trim() !== text(v.text).trim() ? text(v.detail) : null;
+  const method = has(v.method) && !text(v.text).includes(text(v.method)) ? text(v.method) : null;
+  if (detail || method) {
+    const how = el('details', { class: 'how-decided' }, el('summary', null, 'How this was decided'));
+    if (method) how.append(el('p', { class: 'small how-method' }, el('span', { class: 'k' }, 'Method: '), rich(method), '.'));
+    if (detail) how.append(el('p', { class: 'small how-detail' }, rich(detail)));
+    if (basisLine) how.append(basisLine);
+    sec.append(how);
+  } else if (basisLine) sec.append(basisLine);
   sec.addEventListener('click', ev => {
     const a = ev.target.closest ? ev.target.closest('a.to-part') : null;
     const target = a ? document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1))) : null;
@@ -516,6 +586,10 @@ function foundItem(sol, i, rep, C, opts = {}) {
   if (has(s.kind)) head.append(el('span', { class: 'item-kind' }, KIND_NAMES[text(s.kind)] || text(s.kind)));
   if (has(s.d)) head.append(el('span', { class: 'chip', title: 'transcendence degree of the field generated by the solution and its derivatives' }, tex(`d = ${text(s.d)}`)));
   const label = has(s.label) ? text(s.label) : certLabel(s.certificate);
+  const cs = splitConditions(s);
+  // (inside a group of solutions with the same conditions the heading of the group says that the values are special)
+  if (!opts.inGroup && isSpecialFamily(s)) head.append(el('span', { class: 'chip chip-special', title: 'This family exists only on special values of the parameters: one of its conditions is an equality.' }, 'special parameter values'));
+  if (isDirectSearch(s)) head.append(el('span', { class: 'chip chip-search', title: 'Found by a direct search on parameter values that the decision procedure did not analyse; the list there is not claimed to be complete.' }, 'direct search'));
   if (has(s.complex_parameters)) head.append(el('span', { class: 'mark-complex', title: 'There is no such solution for real values of the parameters.' }, text(s.complex_parameters)));
   if (has(s.independent_check)) head.append(independentMark(s.independent_check));
   if (label) head.append(badge(label, { right: true }));
@@ -532,15 +606,33 @@ function foundItem(sol, i, rep, C, opts = {}) {
   const withLhs = tx => (new RegExp('^\\s*' + unknown.replace(/[^A-Za-z]/g, '') + "\\s*('|\\^|_|\\(|\\\\left\\(|=)").test(tx) && /=/.test(tx)) || /^\s*[A-Za-z]\s*:/.test(tx) ? '' : `${unknown}(${v}) = `;
   const consts = isObj(s.constants) ? Object.entries(s.constants) : [];
   const constsLatex = isObj(s.constants_latex) ? s.constants_latex : {};
-  const constRow = () => (consts.length ? (items => (consts.every(([, val]) => text(val).length <= 22) ? inlineList(items.map(x => el('span', { style: 'white-space:nowrap' }, x)), ', ') : ulist(items)))(
-    consts.map(([k, val]) => /^free\b/.test(text(val))
-      ? [mathOf(k, null, { jets: false }), ' ', text(val)]
-      : [mathOf(k, null, { jets: false }), ' = ', mathOf(text(val), constsLatex[k], { jets: false })])) : null);
+  const constItem = ([k, val]) => {
+    if (/^free\b/.test(text(val))) return [mathOf(k, null, { jets: false }), ' ', text(val)];
+    const root = rootNodes(val);
+    if (root) return [mathOf(k, null, { jets: false }), ' is ', root];
+    return [mathOf(k, null, { jets: false }), ' = ', mathOf(text(val), constsLatex[k], { jets: false })];
+  };
+  const constRow = (list = consts) => (list.length ? (items => (list.every(([, val]) => text(val).length <= 22) ? inlineList(items.map(x => el('span', { style: 'white-space:nowrap' }, x)), ', ') : ulist(items)))(
+    list.map(constItem)) : null);
   const display = has(s.display_latex) ? text(s.display_latex) : null;
+  // the readable form can be the solver's own formula: then there is nothing to keep below it
+  const sameForm = !!display && has(latex) && display.replace(/\s+/g, '') === text(latex).replace(/\s+/g, '');
   if (display) {
     // a readable form is the main formula; the form the solver worked with, and its constants, are kept below it
     art.append(formulaBox({ latex: display, sympy: hasExpr ? text(s.expr) : null, prefix: withLhs(display), jets: false }));
-    if (has(s.display_note)) art.append(el('p', { class: 'small muted' }, rich(s.display_note)));
+    if (has(s.display_note)) art.append(el('p', { class: 'small muted display-note' }, clauseNodes(s.display_note)));
+    // a constant given as "any root of …" belongs to the formula: it is said here, not only in the collapsed solver form
+    const shownIn = has(s.display_expr) ? text(s.display_expr) : null;
+    const noteText = text(s.display_note);
+    const name = k => k.replace(/[^A-Za-z0-9_]/g, '');
+    const occurs = k => !shownIn || new RegExp('(^|[^A-Za-z0-9_])' + name(k) + '(?![A-Za-z0-9_])').test(shownIn);
+    const where = consts.filter(([k, val]) => {
+      if (/^free\b/.test(text(val))) return false;
+      if (rootNodes(val)) return !noteText.includes(`${k} is any root of`) && (sameForm || occurs(k));
+      // a constant with an explicit value that the readable formula still contains
+      return !sameForm && !!shownIn && occurs(k) && !new RegExp('(^|;\\s*)' + name(k) + '\\s*=').test(noteText);
+    });
+    if (where.length) art.append(el('p', { class: 'small muted where-roots' }, 'where ', inlineList(where.map(constItem), '; '), '.'));
   } else if (has(latex) || hasExpr) {
     // (a solution described in words, from an earlier record, has no copy buttons and no plot)
     art.append(formulaBox({ latex, sympy: hasExpr ? text(s.expr) : null, prefix, jets: false, tools: hasExpr }));
@@ -550,12 +642,15 @@ function foundItem(sol, i, rep, C, opts = {}) {
     const b = rf.bounded;
     const how = b === true || /^(yes|true|bounded)$/i.test(text(b)) ? ', bounded' : (b === false || /^(no|false)$/i.test(text(b)) ? ', with poles on the real axis' : (has(b) ? ', ' + text(b) : ''));
     const rtex = has(rf.latex) ? text(rf.latex) : null;
-    art.append(el('p', { class: 'real-form-h' }, 'Real on the real axis' + how),
-      formulaBox({ latex: rtex, sympy: has(rf.expr) ? text(rf.expr) : null, prefix: rtex ? withLhs(rtex) : `${unknown}(${v}) = `, jets: false }));
+    // (the real form can be the formula shown above: then the line says so and the formula is not repeated)
+    const mainTex = display || latex;
+    const sameReal = !!rtex && !!mainTex && rtex.replace(/\s+/g, '') === text(mainTex).replace(/\s+/g, '');
+    art.append(el('p', { class: 'real-form-h' }, 'Real on the real axis' + how + (sameReal ? ': the formula above' : '')));
+    if (!sameReal) art.append(formulaBox({ latex: rtex, sympy: has(rf.expr) ? text(rf.expr) : null, prefix: rtex ? withLhs(rtex) : `${unknown}(${v}) = `, jets: false }));
     if (has(rf.note)) art.append(el('p', { class: 'small muted' }, rich(rf.note)));
   }
   if (has(s.description)) art.append(el('p', { class: 'what' }, rich(s.description)));
-  if (display && (has(latex) || hasExpr)) {
+  if (display && !sameForm && (has(latex) || hasExpr)) {
     const d = el('details', { class: 'solver-form' }, el('summary', null, 'Form used by the solver'));
     const body = el('div', { class: 'evidence-body' }, formulaBox({ latex, sympy: hasExpr ? text(s.expr) : null, prefix, jets: false }));
     const cf = facts([['constants', constRow()]]);
@@ -566,8 +661,12 @@ function foundItem(sol, i, rep, C, opts = {}) {
   const real = isObj(s.real) ? s.real : null;
   const f = facts([
     // inside a group of solutions with the same conditions the conditions are in the heading of the group
-    ['holds when', arr(s.conditions).length && !opts.inGroup ? ulist(condList(s.conditions, s.conditions_latex)) : null],
-    ['constants', display ? null : constRow()],
+    ['holds when', cs.par.length && !opts.inGroup ? ulist(condList(cs.par, cs.parL)) : null],
+    // C_I is the value of a first integral: a constant of integration, not a parameter of the equation
+    ['level of the first integral', cs.level.length ? [inlineList(condList(cs.level, cs.levelL)), ' ',
+      el('span', { class: 'small muted' }, '(', tex('C_I'), ': the value of the first integral, a constant of integration)')] : null],
+    // (with a readable form the constants are in the collapsed solver form; the roots are named under the formula)
+    ['constants', display && !sameForm ? null : constRow(sameForm ? consts.filter(([, val]) => !rootNodes(val)) : consts)],
     ['free constants', arr(s.free).length ? inlineList(arr(s.free).map(n => /^[A-Za-z_]\w*$/.test(text(n)) ? mathOf(text(n), null, { jets: false }) : text(n))) : null],
     ['poles in a period', has(s.poles_per_period) ? text(s.poles_per_period) + (arr(s.pole_orders).length ? ` (order${arr(s.pole_orders).length > 1 ? 's' : ''} ${arr(s.pole_orders).map(text).join(', ')})` : '') : (arr(s.pole_orders).length ? 'orders ' + arr(s.pole_orders).map(text).join(', ') : null)],
     ['on the real axis', real ? [has(real.bounded_on_real_axis) ? 'bounded: ' + text(real.bounded_on_real_axis) : null, has(real.note) ? (has(real.bounded_on_real_axis) ? '; ' : '') + text(real.note) : null] : null],
@@ -624,11 +723,18 @@ function ruledItem(item, i, rep, C) {
   if (label) head.append(badge(label, { right: true }));
   else head.append(el('span', { class: 'badge-wrap' }, statusChip('no label recorded')));
   art.append(head);
-  art.append(el('p', { class: 'what' }, rich(has(r.what) ? r.what : '(no description)')));
+  // `what_tex`: the same sentence with its conditions typeset
+  art.append(el('p', { class: 'what' }, rich(has(r.what_tex) ? r.what_tex : (has(r.what) ? r.what : '(no description)'))));
   if (arr(r.conditions).length) {
     art.append(el('p', null, el('span', { class: 'k' }, 'For parameters with '), inlineList(condList(r.conditions, r.conditions_latex)), '.'));
   }
   if (has(r.note)) art.append(el('p', { class: 'small muted' }, rich(r.note)));
+  // the badge is the label of the item; a statement cited from outside the registry keeps its own label only in this note
+  if (has(basis.label_cited) || has(basis.label_note)) {
+    art.append(el('p', { class: 'small muted label-note' },
+      has(basis.label_cited) ? ['The statement cited is ', el('em', null, text(basis.label_cited)), has(basis.label_note) ? '; ' : '.'] : null,
+      has(basis.label_note) ? [rich(basis.label_note), /[.!?]\s*$/.test(text(basis.label_note)) ? '' : '.'] : null));
+  }
   const parts = [];
   if (isThm) parts.push(theoremBlock(basis.theorem, rep, reg));
   else if (has(basis.theorem)) parts.push(el('h4', null, 'Basis'), el('p', null, el('code', { class: 'sympy' }, text(basis.theorem)),
@@ -644,27 +750,33 @@ function ruledItem(item, i, rep, C) {
 }
 
 // the kinds of open questions the engine names: shown as words in the head of the item, never as a raw key
-const OPEN_KINDS = { 'parameter-locus': 'special parameter values', 'entire': 'entire solutions', 'class': 'a class of solutions' };
+const OPEN_KINDS = { 'parameter-locus': 'special parameter values', 'entire': 'entire solutions', 'class': 'a class of solutions', 'reduction': 'another reduction' };
 function openItem(item, i, C, rep) {
   const r = isObj(item) ? item : { what: text(item) };
   const art = el('article', { class: 'item item-open', id: C.idp + 'open-' + (i + 1) });
   const head = el('div', { class: 'item-head' }, el('span', { class: 'item-key' }, 'N' + (i + 1)));
   const kind = has(r.kind) ? (OPEN_KINDS[text(r.kind)] || text(r.kind).replace(/[-_]/g, ' ')) : (r.degenerate === true ? OPEN_KINDS['parameter-locus'] : null);
   if (kind) head.append(el('span', { class: 'item-kind' }, kind));
-  if (r.degenerate === true) head.append(el('span', { class: 'chip' }, 'the equation loses order or degree there'));
+  // `what_tex`: the sentence of the item with its conditions typeset; it then says itself which parameter values are
+  // meant and that the equation loses order or degree there
+  const whatTex = has(r.what_tex) ? text(r.what_tex) : null;
+  if (r.degenerate === true && !(whatTex && /lower order or degree/.test(whatTex))) head.append(el('span', { class: 'chip' }, 'the equation loses order or degree there'));
   head.append(badge('not-decided', { right: true }));
   art.append(head);
-  art.append(el('p', { class: 'what' }, rich(has(r.what) ? r.what : '(no description)')));
+  art.append(el('p', { class: 'what' }, rich(whatTex || (has(r.what) ? r.what : '(no description)'))));
   if (has(r.why)) art.append(el('p', null, el('span', { class: 'k' }, 'Why it is open: '), rich(r.why)));
   if (has(r.partial)) {
     // the engine points to a field of the report by its key: say where the reader finds it on the page
-    const strata = isObj(rep) && arr(rep.strata).length > 0;
+    const strata = isObj(rep) && arr(rep.strata).some(x => isObj(x) && x.exponent_instance !== true);
     const known = typeof r.partial === 'string'
       ? r.partial.replace(/\s*\(see the field 'strata'\)/g, strata ? ' (see “On special values of the parameters” below)' : '') : r.partial;
     art.append(el('p', null, el('span', { class: 'k' }, 'Known anyway: '), rich(known)));
   }
-  if (arr(r.conditions).length) art.append(el('p', null, el('span', { class: 'k' }, 'For parameters with '), inlineList(condList(r.conditions, r.conditions_latex)), '.'));
-  const extra = Object.entries(r).filter(([k, val]) => !['what', 'why', 'partial', 'conditions', 'conditions_latex', 'conditions_factored', 'kind'].includes(k) && has(val)
+  // (not repeated when the typeset sentence above already consists of these conditions)
+  if (arr(r.conditions).length && !(whatTex && /^parameter values (with|at which)\b/.test(whatTex))) {
+    art.append(el('p', null, el('span', { class: 'k' }, 'For parameters with '), inlineList(condList(r.conditions, r.conditions_latex)), '.'));
+  }
+  const extra = Object.entries(r).filter(([k, val]) => !['what', 'what_tex', 'why', 'partial', 'conditions', 'conditions_latex', 'conditions_factored', 'kind'].includes(k) && has(val)
     && !(val === true && (k === 'degenerate' || k === 'scope_note')));
   if (extra.length) art.append(facts(extra.map(([k, val]) => [k.replace(/_/g, ' '), genericValue(val)])));
   return art;
@@ -697,10 +809,12 @@ function strataOf(found) {
   const groups = [], byKey = new Map();
   found.forEach((sol, index) => {
     const s = isObj(sol) ? sol : {};
-    const conds = arr(s.conditions).map(text);
+    // (the level of a first integral is not a condition on the parameters: it stays with the item)
+    const cs = splitConditions(s);
+    const conds = cs.par.map(text);
     const key = conds.join(' & ');
     let g = byKey.get(key);
-    if (!g) { g = { key, conditions: conds, latex: arr(s.conditions_latex), items: [] }; byKey.set(key, g); groups.push(g); }
+    if (!g) { g = { key, conditions: conds, latex: cs.parL, special: conds.some(c => /==/.test(c)), items: [] }; byKey.set(key, g); groups.push(g); }
     g.items.push({ sol, index, id: has(s.id) ? text(s.id) : 'F' + (index + 1), kind: has(s.kind) ? (KIND_NAMES[text(s.kind)] || text(s.kind)) : 'solution' });
   });
   return groups;
@@ -761,23 +875,72 @@ function listsSection(rep, C) {
   };
   const groups = strataOf(found);
   const grouped = found.length > 8 && groups.length > 1;
+  // families on special parameter values (an equality among their conditions) and the others
+  const nSpecial = found.filter(isSpecialFamily).length, nGeneric = found.length - nSpecial;
+  const both = nSpecial > 0 && nGeneric > 0;
   const foundSec = mk('list-found', 'list-found', 'Found', 'Solutions meromorphic in the whole plane, in closed form, each with an exact check.',
     grouped ? [] : found, (it, i) => foundItem(it, allFound.indexOf(it), rep, C), 'No solution is listed.');
   if (grouped) {
     foundSec.querySelector('.empty').remove();
-    foundSec.querySelector('.list-h .n').textContent = `${found.length}, for ${groups.length} sets of conditions on the parameters`;
-    groups.forEach((g, gi) => {
-      const d = el('details', { class: 'stratum' }, el('summary', null, el('span', { class: 'stratum-cond' }, g.conditions.length ? ['When ', stratumConditions(g)] : 'For all values of the parameters'),
+    foundSec.querySelector('.list-h .n').textContent = both
+      ? `${found.length}: ${nGeneric} for generic values of the parameters, ${nSpecial} on special values`
+      : `${found.length}, for ${groups.length} sets of conditions on the parameters`;
+    const groupEls = groups.map((g, gi) => {
+      const d = el('details', { class: 'stratum' + (g.special ? ' stratum-special' : '') }, el('summary', null,
+        el('span', { class: 'stratum-cond' }, g.conditions.length ? ['When ', stratumConditions(g)] : 'For all values of the parameters'),
+        g.special ? el('span', { class: 'chip chip-special' }, 'special parameter values') : null,
         el('span', { class: 'n' }, plural(g.items.length, 'solution'))));
-      if (gi < 2 || found.length <= 12) d.open = true;
+      if (both ? (!g.special || found.length <= 12) : (gi < 2 || found.length <= 12)) d.open = true;
       for (const it of g.items) {
         try { d.append(foundItem(it.sol, allFound.indexOf(it.sol), rep, C, { inGroup: true })); }
         catch (e) { d.append(el('article', { class: 'item' }, el('p', { class: 'small muted' }, 'This item could not be displayed: '), el('pre', { class: 'raw' }, JSON.stringify(it.sol, null, 1)))); }
       }
-      foundSec.append(d);
+      return d;
     });
-  }
-  if (found.length > 4 && groups.length > 1) {
+    // two arrangements of the same groups: the generic families first and the special ones together in one collapsed
+    // part, or all groups in the order of the report
+    const body = el('div', { class: 'found-body' });
+    const overview = gs => { try { return gs.length > 1 ? foundOverview(gs, C) : null; } catch (e) { console.warn('overview failed', e); return null; } };
+    const arrange = mode => {
+      body.textContent = '';
+      if (mode === 'generic' && both) {
+        const gen = groups.filter(g => !g.special), spec = groups.filter(g => g.special);
+        const ov = overview(gen);
+        if (ov) body.append(ov);
+        gen.forEach(g => body.append(groupEls[groups.indexOf(g)]));
+        const part = el('details', { class: 'stratum special-families', id: idp + 'special-families' }, el('summary', null,
+          el('span', { class: 'stratum-cond' }, 'On special values of the parameters'),
+          el('span', { class: 'n' }, `${plural(nSpecial, 'solution')}, for ${plural(spec.length, 'set')} of conditions`)));
+        part.append(el('p', { class: 'small muted' }, 'Families that exist only where the parameters satisfy an equality; each set of conditions is a part below.'));
+        const ovs = overview(spec);
+        if (ovs) part.append(ovs);
+        spec.forEach(g => part.append(groupEls[groups.indexOf(g)]));
+        body.append(part);
+      } else {
+        const ov = overview(groups);
+        if (ov) body.append(ov);
+        groupEls.forEach(d => body.append(d));
+      }
+      requestAnimationFrame(() => markScrollable(body));
+    };
+    if (both) {
+      const toggle = el('p', { class: 'view-toggle', role: 'group', 'aria-label': 'Order of the list of solutions' }, el('span', { class: 'k' }, 'Show: '));
+      const setView = mode => {
+        for (const b of toggle.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.view === mode));
+        arrange(mode);
+      };
+      for (const [mode, name] of [['generic', 'generic families first'], ['all', 'all, in the order of the report']]) {
+        const b = el('button', { type: 'button', class: 'view-btn', 'data-view': mode, 'aria-pressed': 'false' }, name);
+        b.addEventListener('click', () => setView(mode));
+        toggle.append(b);
+      }
+      foundSec.append(toggle, body);
+      setView('generic');
+    } else {
+      foundSec.append(body);
+      arrange('all');
+    }
+  } else if (found.length > 4 && groups.length > 1) {
     try { foundSec.querySelector('.lead').after(foundOverview(groups, C)); } catch (e) { console.warn('overview failed', e); }
   }
   try { const il = independentLine(rep.independent_check); if (il) foundSec.querySelector('.lead').after(il); } catch (e) { console.warn('independent check line failed', e); }
@@ -798,13 +961,16 @@ function listsSection(rep, C) {
     });
     foundSec.append(box);
   }
-  // formulas whose substitution check did not run or did not pass: collapsed, not counted anywhere
+  // formulas whose substitution check did not run or did not pass: their own collapsed part under the three lists,
+  // never inside "Found", not counted anywhere
   const candidates = arr(rep.candidates);
+  let candidatesBlock = null;
   if (unconfirmed.length || candidates.length) {
     const n = unconfirmed.length + candidates.length;
-    const d = el('details', { class: 'stratum unconfirmed-list', id: idp + 'candidates' }, el('summary', null,
-      el('span', { class: 'stratum-cond' }, 'Candidates without a passed check'), el('span', { class: 'n' }, `${n}, not counted`)));
-    d.append(el('p', { class: 'small muted' }, 'Formulas of the shape of a solution whose exact substitution check did not run or did not pass. Nothing is claimed about them; they are not counted anywhere.'));
+    const d = el('details', { class: 'block unconfirmed-list', id: idp + 'candidates' }, el('summary', null,
+      'Candidates (not verified)', el('span', { class: 'n' }, `${n}, not counted`)));
+    candidatesBlock = d;
+    d.append(el('p', { class: 'small muted' }, 'Formulas of the shape of a solution whose exact substitution check did not run or did not pass. Nothing is claimed about them; they are not in the list “Found” and are not counted anywhere.'));
     const Cc = Object.assign({}, C, { idp: idp + 'cand-' });
     unconfirmed.forEach(it => {
       try { const node = foundItem(it, allFound.indexOf(it), rep, C); node.classList.add('unconfirmed'); d.append(node); }
@@ -817,9 +983,10 @@ function listsSection(rep, C) {
         d.append(node);
       } catch (e) { d.append(el('pre', { class: 'raw' }, JSON.stringify(it, null, 1))); }
     });
-    foundSec.append(d);
     const empty = foundSec.querySelector('.empty');
     if (empty && !found.length) empty.textContent = 'No solution with a passed check is listed.';
+    foundSec.append(el('p', { class: 'small muted candidates-pointer' }, `${plural(n, 'candidate')} without a passed check ${n === 1 ? 'is' : 'are'} kept apart: `,
+      el('a', { href: `#${idp}candidates`, class: 'to-item' }, 'Candidates (not verified)'), '.'));
   }
   foundSec.addEventListener('click', ev => {
     const a = ev.target.closest ? ev.target.closest('a.to-item') : null;
@@ -833,6 +1000,7 @@ function listsSection(rep, C) {
     mk('list-open', 'list-open', 'Not decided', 'What remains open for this equation, with what is known anyway.',
       open, (it, i) => openItem(it, i, C, rep), 'Nothing is listed as open.'));
   frag.append(wrap);
+  if (candidatesBlock) frag.append(candidatesBlock);
   return frag;
 }
 
@@ -857,21 +1025,27 @@ function subReportBody(sub, C) {
   return body;
 }
 /** a collapsible sub-report whose body is built when it is first opened */
-function subReportDetails(id, summaryNodes, sub, C, leadNodes) {
+function subReportDetails(id, summaryNodes, sub, C, leadNodes, opts = {}) {
   const d = el('details', { class: 'block sub-report', id }, el('summary', null, summaryNodes));
   let built = false;
-  d.addEventListener('toggle', () => {
-    if (!d.open || built) return;
+  const build = () => {
+    if (built) return;
     built = true;
     if (leadNodes) d.append(...[].concat(leadNodes).filter(Boolean));
     d.append(subReportBody(sub, C));
-  });
+  };
+  d.addEventListener('toggle', () => { if (d.open) build(); });
+  if (opts.open) { build(); d.open = true; }
   return d;
 }
-function subSummary(title, sub) {
+function subSummary(title, sub, opts = {}) {
   const v = isObj(sub.verdict) ? sub.verdict : null;
   const out = [el('span', { class: 'sub-title' }, title)];
-  if (v) out.push(el('span', { class: 'sub-verdict' }, meter(v.level), el('strong', null, levelWords(v.level)), has(v.text) ? [' — ', rich(v.text)] : null));
+  if (v) {
+    // the level as in the verdict box of the case; of a standard sentence, the part before "Method: …"
+    const lvl = has(v.overall) ? v.overall : v.level;
+    out.push(el('span', { class: 'sub-verdict' }, meter(lvl), el('strong', null, levelWords(lvl)), has(v.text) && opts.text !== false ? [' — ', rich(text(v.text).split(/\s+Method:\s/)[0])] : null));
+  }
   else if (has(sub.status)) out.push(el('span', { class: 'sub-verdict muted' }, text(sub.status)));
   return out;
 }
@@ -879,10 +1053,36 @@ function subSummary(title, sub) {
 function strataSection(rep, C) {
   const st = arr(rep.strata).filter(isObj);
   if (!st.length) return null;
+  // (the element ids count all strata, so that the links of the verdict box find both kinds)
+  const isExponent = s => s.exponent_instance === true;
+  const expo = st.filter(isExponent), rest = st.filter(s => !isExponent(s));
+  const out = [];
+  if (expo.length) {
+    const sec = el('section', { class: 'sub-reports exponents', id: C.idp + 'exponents', 'aria-labelledby': C.idp + 'h-exponents' },
+      el('h2', { id: C.idp + 'h-exponents' }, 'For particular exponents', el('span', { class: 'n' }, plural(expo.length, 'case'))));
+    sec.append(el('p', { class: 'small muted' }, 'The equation of this page for particular values of the exponent, each analysed on its own. Each case has its own verdict and its own three lists.'));
+    st.forEach((s, i) => {
+      if (!isExponent(s)) return;
+      const where = arr(s.conditions).length ? ['For ', inlineList(condList(s.conditions, s.conditions_latex))] : 'A particular exponent';
+      const id = `${C.idp}stratum-${i + 1}`;
+      if (!hasAnalysis(s) && !isObj(s.equation)) {
+        sec.append(el('p', { class: 'sub-row', id }, el('strong', null, where), ': ', has(s.status) ? text(s.status) : 'no analysis recorded', has(s.note) ? [' — ', rich(s.note)] : null));
+        return;
+      }
+      const lead = [];
+      if (has(s.note)) lead.push(el('p', { class: 'small muted' }, rich(text(s.note).replace(/^(\w)/, c => c.toUpperCase())), /[.!?]\s*$/.test(text(s.note)) ? '' : '.'));
+      if (has(s.status) && text(s.status) !== 'analysed') lead.push(el('p', { class: 'small' }, 'Status: ' + text(s.status)));
+      // (open from the start: the title is the condition and the level; the sentence is in the verdict box below it)
+      sec.append(subReportDetails(id, subSummary(where, s, { text: false }), s, { reg: C.reg, idp: `${C.idp}st${i + 1}-`, sub: true }, lead, { open: true }));
+    });
+    out.push(sec);
+  }
+  if (!rest.length) return out;
   const sec = el('section', { class: 'sub-reports', id: C.idp + 'strata', 'aria-labelledby': C.idp + 'h-strata' },
-    el('h2', { id: C.idp + 'h-strata' }, 'On special values of the parameters', el('span', { class: 'n' }, plural(st.length, 'case'))));
+    el('h2', { id: C.idp + 'h-strata' }, 'On special values of the parameters', el('span', { class: 'n' }, plural(rest.length, 'case'))));
   sec.append(el('p', { class: 'small muted' }, 'Where the parameters satisfy one of these conditions the equation changes its character; it was analysed again there. Each case has its own verdict and its own three lists.'));
   st.forEach((s, i) => {
+    if (isExponent(s)) return;
     const where = arr(s.conditions).length ? ['On the locus ', inlineList(condList(s.conditions, s.conditions_latex))] : 'A special case';
     const id = `${C.idp}stratum-${i + 1}`;
     const degenerate = /^degenerate/i.test(text(s.status));
@@ -897,7 +1097,8 @@ function strataSection(rep, C) {
     if (has(s.status) && text(s.status) !== 'analysed') lead.push(el('p', { class: 'small' }, 'Status: ' + text(s.status)));
     sec.append(subReportDetails(id, subSummary(where, s), s, { reg: C.reg, idp: `${C.idp}st${i + 1}-`, sub: true }, lead));
   });
-  return sec;
+  out.push(sec);
+  return out;
 }
 
 function substitutionsSection(rep, C) {
@@ -1215,15 +1416,98 @@ function theoremsSection(rep, reg) {
   return d;
 }
 
+/** the normal form in which the search for solutions was made (`w_search.normal_form`) and the special parameter values
+    the search treated separately (`w_search.special_loci`): typeset, as a part of the technical section */
+function solverNormalForm(ws) {
+  const nf = isObj(ws) && isObj(ws.normal_form) ? ws.normal_form : null;
+  const loci = isObj(ws) ? arr(ws.special_loci).filter(isObj) : [];
+  if (!(nf && (has(nf.reduced_equation) || isObj(nf.map))) && !loci.length) return null;
+  const d = el('details', { class: 'detail solver-nf', 'data-key': 'solver_normal_form' }, el('summary', null, 'Normal form used by the solver'));
+  const body = el('div', { class: 'evidence-body' });
+  const condsOf = c => (Array.isArray(c) ? c : text(c).split(/\s*,\s+/)).filter(has);
+  if (nf) {
+    const map = isObj(nf.map) ? nf.map : {};
+    body.append(el('p', { class: 'small muted' }, 'The search for rational, simply periodic and elliptic solutions was made for an equation with fewer parameters, for an unknown ',
+      tex('W(Z)'), '.', has(nf.note) ? [' ', rich(text(nf.note).replace(/^(\w)/, c => c.toUpperCase()).replace(/\(1 parameters /, '(1 parameter ')), '.'] : null));
+    if (has(nf.reduced_equation)) {
+      let lx = sympyToLatex(text(nf.reduced_equation), { unknown: 'W' });
+      if (lx && !/=/.test(lx)) lx += ' = 0';
+      body.append(el('p', { class: 'k' }, 'The reduced equation'), formulaBox({ latex: lx, sympy: text(nf.reduced_equation), unknown: 'W' }));
+    }
+    const syms = isObj(nf.symbols) ? Object.entries(nf.symbols).filter(([, val]) => has(val)) : [];
+    if (syms.length) {
+      const t = el('table', { class: 'mini symbols' }, el('thead', null, el('tr', null, el('th', { scope: 'col' }, 'Symbol'), el('th', { scope: 'col' }, 'In the parameters of the equation'))));
+      const tb = el('tbody');
+      for (const [k, val] of syms) {
+        const lx = sympyToLatex(text(val), { jets: false });
+        tb.append(el('tr', null, el('td', null, mathOf(k, null, { jets: false })),
+          el('td', null, lx !== null ? el('span', { class: 'math-scroll' }, tex('\\displaystyle ' + lx)) : el('code', { class: 'sympy' }, text(val)))));
+      }
+      t.append(tb);
+      body.append(el('div', { class: 'table-wrap' }, t));
+    }
+    const greek = [['alpha', '\\alpha'], ['beta', '\\beta'], ['gamma', '\\gamma']].filter(([k]) => has(map[k]));
+    if (greek.length || has(map.rule)) {
+      body.append(el('p', { class: 'small nf-rule' }, 'Solutions correspond by ', tex('w(z) = \\alpha\\, W(z/\\gamma) + \\beta'),
+        greek.length ? [', where ', inlineList(greek.map(([k, name]) => el('span', { class: 'math-scroll' }, (lx => (lx !== null ? tex(`${name} = ${lx}`) : [tex(name + ' = '), el('code', { class: 'sympy' }, text(map[k]))]))(sympyToLatex(text(map[k]), { jets: false })))), ', ')] : null, '.'));
+    }
+    if (has(map.rho)) {
+      const m = /^\s*([A-Za-z_]\w*)\s*=\s*(any root of .*)$/.exec(text(map.rho));
+      const r = m ? rootNodes(m[2]) : null;
+      body.append(el('p', { class: 'small nf-rho' }, 'Here ', r ? [mathOf(m[1], null, { jets: false }), ' is ', r] : rich(map.rho), '.'));
+    }
+    const f = facts([
+      ['valid when', condsOf(nf.conditions).length ? inlineList(condList(condsOf(nf.conditions), nf.conditions_latex)) : null],
+      ['what the correspondence gives', has(nf.statement) ? el('span', { class: 'small' }, rich(nf.statement)) : null],
+      ['parameter values not covered', arr(nf.loci_not_covered).length ? inlineList(arr(nf.loci_not_covered).map(c => condNode(c)), '; ') : null],
+    ]);
+    if (f) body.append(f);
+  }
+  if (loci.length) {
+    const t = el('table', { class: 'mini' }, el('caption', null, 'Special parameter values searched separately'),
+      el('thead', null, el('tr', null, el('th', { scope: 'col' }, 'Parameter values'), el('th', { scope: 'col' }, 'Searches finished'), el('th', { scope: 'col' }, 'Not finished'))));
+    const tb = el('tbody');
+    for (const l of loci) {
+      const where = el('td', null, condsOf(l.conditions).length ? inlineList(condList(condsOf(l.conditions), l.conditions_latex)) : '');
+      if (l.degenerate === true) {
+        // the equation is another one there: the note of the engine instead of the two lists of searches
+        tb.append(el('tr', { class: 'locus-degenerate' }, where, el('td', { colspan: '2' }, has(l.note) ? rich(l.note) : 'the equation loses order or degree there; not searched')));
+        continue;
+      }
+      const under = condsOf(l.under);
+      tb.append(el('tr', null, where,
+        el('td', null, arr(l.finished).length ? arr(l.finished).map(text).join('; ') : 'none',
+          under.length && arr(l.finished).length ? el('span', { class: 'locus-under' }, ' — finished under ', inlineList(condList(under))) : null,
+          has(l.note) ? el('span', { class: 'small muted' }, ' ', rich(l.note)) : null),
+        el('td', null, arr(l.unfinished).length ? arr(l.unfinished).map(text).join('; ') : 'none')));
+    }
+    t.append(tb);
+    body.append(el('div', { class: 'table-wrap' }, t));
+  }
+  d.append(body);
+  return d;
+}
+
 /** engine details (tier, low_order, entire, ends, pole_bound, free_coefficients, w_search, invariants) in one collapsed section */
 function detailsSection(rep) {
   const present = DETAIL_KEYS.filter(k => has(rep[k]) && !(isObj(rep[k]) && !Object.keys(rep[k]).length));
   const facts_used = isObj(rep.verdict) ? arr(rep.verdict.facts_used).filter(has) : [];
-  if (!present.length && !facts_used.length) return null;
-  const d = el('details', { class: 'block', id: 'computation' }, el('summary', null, 'Details of the computation', el('span', { class: 'n' }, plural(present.length + (facts_used.length ? 1 : 0), 'part'))));
+  let solverNf = null;
+  try { solverNf = solverNormalForm(parseMaybe(rep.w_search)); } catch (e) { console.warn('normal form of the solver failed', e); }
+  const copies = arr(rep.copies_removed).map(c => (isObj(c) ? c : { why: text(c) })).filter(c => has(c.id) || has(c.why));
+  if (!present.length && !facts_used.length && !solverNf && !copies.length) return null;
+  const d = el('details', { class: 'block', id: 'computation' }, el('summary', null, 'Details of the computation', el('span', { class: 'n' }, plural(present.length + (facts_used.length ? 1 : 0) + (solverNf ? 1 : 0) + (copies.length ? 1 : 0), 'part'))));
   d.append(el('p', { class: 'small muted' }, 'What each module of the engine returned, as recorded in the report. The three lists and the verdict above are assembled from these data.'));
   if (facts_used.length) {
     d.append(el('details', { class: 'detail', 'data-key': 'facts_used' }, el('summary', null, 'Facts used by the verdict'), ulist(facts_used.map(x => el('span', { class: 'small' }, rich(text(x)))))));
+  }
+  if (solverNf) d.append(solverNf);
+  if (copies.length) {
+    const cd = el('details', { class: 'detail copies-removed', 'data-key': 'copies_removed' },
+      el('summary', null, `${plural(copies.length, 'repetition')} ${copies.length === 1 ? 'was' : 'were'} removed from the list`));
+    cd.append(el('p', { class: 'small muted' }, 'A solution that is another listed solution in a different form is listed once. The reasons given by the engine:'),
+      ulist(copies.map(c => [has(c.id) ? [el('code', { class: 'sympy' }, text(c.id)), ': '] : null, has(c.why) ? rich(c.why) : 'no reason recorded']), 'small'));
+    d.append(cd);
   }
   for (const k of present) {
     const v = parseMaybe(rep[k]);

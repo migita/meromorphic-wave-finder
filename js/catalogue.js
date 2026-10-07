@@ -10,6 +10,48 @@ let sortKey = 'weight', sortDir = -1;
 const fieldsOf = e => arr(e.field).map(text).filter(Boolean);
 // the overall level (it takes the special parameter loci into account) when the report has it
 const levelOf = e => (e.has_report ? text(has(e.overall) ? e.overall : e.verdict) : '');
+/** for an answer that is complete for generic parameters: what is known on the special parameter values */
+function specialNote(e) {
+  const sm = has(e.special_min) ? text(e.special_min) : '';
+  const n = Number(e.special_open) || 0;
+  const bits = [];
+  if (sm === 'complete') bits.push('special values analysed');
+  else if (sm && sm !== 'not analysed') bits.push('special loci: ' + (LEVELS[sm] ? levelName(sm, true).toLowerCase() : sm));
+  if (sm !== 'complete' && n > 0) bits.push(`${n} ${n === 1 ? 'set' : 'sets'} of special parameter values not analysed`);
+  else if (sm === 'not analysed') bits.push('special values not analysed');
+  return bits.length ? el('span', { class: 'aka special' }, bits.join('; ')) : null;
+}
+/** one side of a relation of an ansatz as LaTeX, or null: "∫ w(z) dz" is written with the integral sign */
+function ansatzSide(t) {
+  const mi = /^(∫+)\s*(.+?)\s+((?:d[A-Za-z]\w*\s*)+)$/.exec(t.trim());
+  if (mi) {
+    const inner = ansatzSide(mi[2]);
+    if (inner === null) return null;
+    const ds = mi[3].trim().split(/\s+/).map(d => '\\,d' + (sympyToLatex(d.slice(1), { jets: false }) || d.slice(1))).join('');
+    return '\\int '.repeat(mi[1].length) + inner + ds;
+  }
+  const lx = sympyToLatex(t, { jets: false });
+  return lx === null ? null : lx.replace(/\\operatorname\{([A-Za-z])\}/g, '$1');
+}
+/** the ansatz line: typeset if every relation of it can be read, else as code; a closing remark in brackets as text */
+function ansatzNodes(a) {
+  const m = /^(.*?)\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)\s*$/.exec(a);
+  const remark = m && /[a-z]{3,} [a-z]{2,}/.test(m[2]) && !/=\s*$/.test(m[1]) ? m[2] : null;      // words, not a formula
+  const main = remark ? m[1] : a;
+  const code = () => [el('code', { class: 'sympy' }, main), remark ? [' ', el('span', { class: 'ansatz-note' }, '(' + remark + ')')] : null];
+  const out = [];
+  for (const piece of main.split(/,\s+/)) {
+    const i = piece.indexOf('=');
+    if (i <= 0) return code();
+    const L = ansatzSide(piece.slice(0, i)), R = ansatzSide(piece.slice(i + 1));
+    if (L === null || R === null) return code();
+    out.push(`${L} = ${R}`);
+  }
+  if (!out.length) return code();
+  const node = tex(out.join(',\\quad '));
+  if (node.classList.contains('math-raw')) return code();
+  return [el('span', { class: 'math-scroll' }, node), remark ? [' ', el('span', { class: 'ansatz-note' }, '(' + remark + ')')] : null];
+}
 const levelRank = e => { const i = LEVEL_ORDER.indexOf(levelOf(e)); return i < 0 ? 99 : i; };
 const num = v => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
 
@@ -92,7 +134,7 @@ function draw() {
       el('td', { class: 'num', 'data-label': 'order' }, has(e.order) ? text(e.order) : el('span', { class: 'muted' }, '–')),
       el('td', { class: 'num', 'data-label': 'degree' }, has(e.degree) ? text(e.degree) : el('span', { class: 'muted' }, '–')),
       el('td', { class: 'lvl' }, e.has_report ? [meter(lvl), el('span', { title: LEVELS[lvl] ? LEVELS[lvl].long : '' }, levelName(lvl, true)),
-        lvl === 'complete-generic' && has(e.special_min) ? el('span', { class: 'aka special' }, 'special loci: ' + (LEVELS[text(e.special_min)] ? levelName(text(e.special_min), true).toLowerCase() : text(e.special_min))) : null,
+        lvl === 'complete-generic' ? specialNote(e) : null,
         lvl === 'partial' && e.record_complete ? el('span', { class: 'aka' }, 'complete list in an earlier record') : null] : el('span', { class: 'muted' }, noReportText(e))),
       cnt('found', 'found'), cnt('ruled_out', 'ruled out'), cnt('not_decided', 'not decided'),
       el('td', { class: 'num', 'data-label': 'weight' }, has(e.weight) ? text(e.weight) : el('span', { class: 'muted' }, '–'))));
@@ -167,7 +209,18 @@ async function showEntry(id) {
     // two readable lines: the ansatz, the reduced equation (and, for lumped coefficients, what they stand for);
     // everything else (steps of the reduction, checks, type, notes) is in a collapsed block
     const block = el('div', { class: 'reduction-block' });
-    if (red && has(red.ansatz)) block.append(el('p', { class: 'red-line' }, 'Ansatz: ', el('code', { class: 'sympy' }, text(red.ansatz))));
+    // the true first line (built by the engine from the corpus entry: an order lowering or a substitution changes
+    // what the listed function w is), else the ansatz of the corpus entry
+    const ansatz = has(e.ansatz_true) ? text(e.ansatz_true) : (red && has(red.ansatz) ? text(red.ansatz) : null);
+    if (ansatz) block.append(el('p', { class: 'red-line' }, 'Ansatz: ', ansatzNodes(ansatz)));
+    if (e.constant_zero) {
+      // the reduction set a constant of integration to 0: said here, in view, not only in the details
+      const c = typeof e.constant_zero === 'string' ? e.constant_zero : null;
+      block.append(el('p', { class: 'entry-scope' }, c
+        ? ['This form is the reduction under the condition ', mathOf(`${c} == 0`, null, { jets: false }), '; travelling waves with ', mathOf(`${c} != 0`, null, { jets: false }),
+          ' satisfy a different equation and are not covered on this page.']
+        : 'This form is the reduction with a constant of integration set to 0; travelling waves with a non-zero value of that constant satisfy a different equation and are not covered on this page.'));
+    }
     const ode = has(e.ode) ? text(e.ode) : (red && has(red.ode) ? text(red.ode) : null);
     let olx = has(e.ode_latex) ? text(e.ode_latex) : null;
     if (olx && !/=/.test(olx)) olx += ' = 0';

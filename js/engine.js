@@ -3,6 +3,13 @@
 //                                                               POST ./api/verify  {"equation", "expr", "options"} -> dict
 //   2. otherwise the engine in the browser: a Web Worker with Pyodide (js/worker.js).
 // All URLs are relative to the page, so the site works under any sub-path.
+//
+// The engine in the browser can meet a single computation that does not end; the limits of the engine itself cannot
+// stop it from inside. The page can: it terminates the worker. analyze() therefore watches the worker: if there is
+// no answer 2 * budget + 30 seconds after the analysis was posted to a ready worker, the worker is terminated and
+// the same text is analysed again in a new worker with the option skip_steps = the steps that did not end (their
+// labels are the text after "step: " in the lines the engine prints). At most three repetitions; then an error
+// that says which steps did not end.
 
 const base = () => document.baseURI;
 const url = rel => new URL(rel, base()).href;
@@ -32,6 +39,10 @@ const pending = new Map();
 let hooks = {};
 let abortServer = null;
 let active = 0;
+let lastStep = null;                    // label of the last line "step: <label>" of the running analysis
+let cancelSeq = 0;                      // counts the calls of cancel(): an analysis that was cancelled is not repeated
+export const MAX_REPETITIONS = 3;
+export const watchdogSeconds = budget => 2 * (Number(budget) > 0 ? Number(budget) : 30) + 30;
 
 function emit(name, arg) { try { if (hooks[name]) hooks[name](arg); } catch (e) { console.warn(e); } }
 
@@ -43,7 +54,11 @@ function startWorker() {
     worker.onmessage = ev => {
       const m = ev.data || {};
       if (m.type === 'status') emit('onStatus', m);
-      else if (m.type === 'log') emit('onLog', m.line);
+      else if (m.type === 'log') {
+        const s = /^(?:step:\s*)+(.*\S)\s*$/.exec(String(m.line));
+        if (s) lastStep = s[1];
+        emit('onLog', m.line);
+      }
       else if (m.type === 'ready') { engineInfo = m.info; emit('onReady', m.info); resolve(m.info); }
       else if (m.type === 'result' || m.type === 'error') {
         if (m.type === 'error' && m.boot) { const e = new Error(m.message); e.boot = true; reject(e); stopWorker(e); return; }
@@ -72,14 +87,63 @@ function stopWorker(err) {
   pending.clear();
 }
 
-async function callWorker(msg) {
+async function callWorker(msg, limitMs = 0) {
   await startWorker();
   const id = ++nextId;
-  const out = await new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    worker.postMessage(Object.assign({ id }, msg));
-  });
-  return typeof out === 'string' ? JSON.parse(out) : out;
+  let timer = null;
+  lastStep = null;
+  try {
+    const out = await new Promise((resolve, reject) => {
+      pending.set(id, { resolve, reject });
+      worker.postMessage(Object.assign({ id }, msg));
+      // the watchdog: counted from the moment the request is posted to a worker that is ready
+      if (limitMs > 0) {
+        timer = setTimeout(() => {
+          const e = new Error('The engine in the browser did not answer within the time limit.');
+          e.watchdog = true; e.step = lastStep;
+          stopWorker(e);                               // terminates the worker; the request is rejected with e
+        }, limitMs);
+      }
+    });
+    return typeof out === 'string' ? JSON.parse(out) : out;
+  } finally { clearTimeout(timer); }
+}
+
+/** the analysis in the browser, repeated without the steps that do not end (see the head of this file) */
+async function analyzeInBrowser(textInput, options) {
+  const seq = cancelSeq;
+  // (options.watchdog_s replaces the limit; it exists for the tests of the two ways in which the watchdog gives up)
+  const limitS = Number(options.watchdog_s) > 0 ? Number(options.watchdog_s) : watchdogSeconds(options.budget_s);
+  const skipped = [];
+  const cancelled = () => { const c = new Error('cancelled'); c.cancelled = true; return c; };
+  const quote = list => list.map(s => `“${s}”`).join(', ');
+  const within = `${limitS} ${limitS === 1 ? 'second' : 'seconds'}`;
+  for (let attempt = 1; ; attempt++) {
+    if (seq !== cancelSeq) throw cancelled();
+    const opts = Object.assign({ mode: 'light' }, options);
+    delete opts.watchdog_s;
+    if (skipped.length) opts.skip_steps = skipped.slice();
+    try {
+      const report = await callWorker({ type: 'analyze', text: textInput, options: opts }, limitS * 1000);
+      return { report, repetitions: attempt - 1, skipped: skipped.slice() };
+    } catch (e) {
+      if (!e || !e.watchdog) throw e;                  // cancelled, or an error of the engine or of its start
+      if (seq !== cancelSeq) throw cancelled();
+      const step = e.step;
+      const fail = msg => { const err = new Error(msg); err.unfinished = true; err.steps = skipped.concat(step && !skipped.includes(step) ? [step] : []); err.limit_s = limitS; err.attempts = attempt; return err; };
+      if (!step) {
+        throw fail(`The engine in the browser did not answer within ${within} and had not yet named a step of the analysis`
+          + (skipped.length ? ` (left out before: ${quote(skipped)})` : '') + '.');
+      }
+      if (skipped.includes(step)) throw fail(`The analysis did not end within ${within} although the step ${quote([step])} was left out.`);
+      if (attempt > MAX_REPETITIONS) {
+        throw fail(`The analysis was started ${attempt} times, each time without the steps that had not ended, and did not end: ${quote(skipped.concat([step]))} did not end within ${within} each.`);
+      }
+      skipped.push(step);
+      emit('onRestart', { step, steps: skipped.slice(), repetition: attempt, limit_s: limitS,
+        text: `The step ${quote([step])} did not end within ${within}. The analysis is being repeated without ${skipped.length > 1 ? 'the steps ' + quote(skipped) : 'it'}; the answer may be weaker than that of the full analysis.` });
+    }
+  }
 }
 
 async function postServer(path, payload) {
@@ -113,8 +177,8 @@ export async function analyze(textInput, options = {}, h = {}) {
       const report = await postServer('./api/analyze', { text: textInput, options: Object.assign({ mode: 'heavy' }, options) });
       return { report, backend: 'server', info: server };
     }
-    const report = await callWorker({ type: 'analyze', text: textInput, options: Object.assign({ mode: 'light' }, options) });
-    return { report, backend: 'browser', info: engineInfo };
+    const r = await analyzeInBrowser(textInput, options);
+    return { report: r.report, backend: 'browser', info: engineInfo, repetitions: r.repetitions, skipped: r.skipped };
   } finally { active--; }
 }
 
@@ -145,6 +209,7 @@ export async function warmUp(h = {}) { hooks = h; return startWorker(); }
 
 /** Stop whatever is running. The browser engine has to be started again afterwards. */
 export function cancel() {
+  cancelSeq++;
   const e = new Error('cancelled'); e.cancelled = true;
   if (abortServer) abortServer.abort();
   if (worker) stopWorker(e);

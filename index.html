@@ -27,6 +27,7 @@
       <li><a href="coverage.html" data-nav="coverage">Coverage</a></li>
       <li><a href="check.html" data-nav="check">Check a solution</a></li>
       <li><a href="method.html" data-nav="method">Method</a></li>
+      <li><a href="checks.html" data-nav="checks">Checks</a></li>
     </ul>
   </nav>
 </header>
@@ -46,10 +47,12 @@
       <button type="submit" class="primary" id="go">Analyse</button>
     </div>
     <p id="input-error" class="input-error" role="alert" hidden></p>
+    <div id="input-warnings" class="input-warnings" role="note" aria-label="Notes of the engine on this input" hidden></div>
     <ul class="chips" id="examples" aria-label="Examples"></ul>
     <div id="status" class="status" role="status" aria-live="polite" hidden>
       <div class="status-text">
         <p class="now" id="status-now"></p>
+        <p class="status-note" id="status-note" hidden></p>
         <p class="small muted" id="status-elapsed"></p>
         <div class="log" id="status-log" aria-label="Messages of the engine"></div>
       </div>
@@ -80,8 +83,8 @@
   <div id="result" class="result" aria-live="off"></div>
 </main>
 <footer class="site-footer">
-  <p>Data of 6 October 2026, 17:37 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
-  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
+  <p>Data of 7 October 2026, 02:33 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>. <a href="checks.html">Which checks were made</a>.</p>
 </footer>
 
 </body>

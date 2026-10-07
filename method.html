@@ -27,6 +27,7 @@
       <li><a href="coverage.html" data-nav="coverage">Coverage</a></li>
       <li><a href="check.html" data-nav="check">Check a solution</a></li>
       <li><a href="method.html" data-nav="method">Method</a></li>
+      <li><a href="checks.html" data-nav="checks">Checks</a></li>
     </ul>
   </nav>
 </header>
@@ -135,7 +136,11 @@
   check: the formula is substituted into the equation and the result is reduced to zero by exact computation (for
   elliptic solutions modulo <span data-tex="\wp'^2 = 4\wp^3 - g_2\wp - g_3">℘′² = 4℘³ − g₂℘ − g₃</span>). Anyone
   can rerun the check on the page <a href="check.html">Check a solution</a>. A solution may hold only under
-  conditions on the parameters; the conditions are listed with it.</p>
+  conditions on the parameters; the conditions are listed with it. A family marked <em>special parameter values</em>
+  exists only where the parameters satisfy an equality; in a long list these families are collected in one part
+  below the families for generic values. A family marked <em>direct search</em> was found by a search on parameter
+  values that the decision procedure did not analyse; the list on those values is not claimed to be complete. A
+  formula whose check did not run is kept apart under “Candidates (not verified)” and is not counted.</p>
   <p><strong>Ruled out.</strong> Kinds of meromorphic solutions that cannot exist. Each item names its basis: a theorem
   of the list below, together with a record of how every hypothesis was verified for this equation, or an exact
   computation that can be rerun.</p>
@@ -172,7 +177,7 @@
   the exact computation: the formula is substituted and the result is reduced to zero. The independent check is a
   redundancy test by different code outside the engine, which substitutes the same formula again, exactly where it
   can and otherwise numerically to 30 digits at random points of the parameter locus; it guards against an error of
-  the program and is not a second proof.</p>
+  the program and is not a second proof. Its totals over all reports are on the page <a href="checks.html">Checks</a>.</p>
   </div>
 
   <h2 id="theorems">The theorems</h2>
@@ -212,8 +217,8 @@
   </div>
 </main>
 <footer class="site-footer">
-  <p>Data of 6 October 2026, 17:37 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
-  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>.</p>
+  <p>Data of 7 October 2026, 02:33 UTC (250 catalogue entries, 248 reports); engine version: mero 0.2 (6 October 2026). <span id="backend-note"></span></p>
+  <p>Every result carries a label that says what it rests on. <a href="method.html">What the site does and does not do</a>. <a href="checks.html">Which checks were made</a>.</p>
 </footer>
 
 </body>
